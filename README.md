@@ -1,5 +1,8 @@
 # PrayRequest
 
+> 因為，出於神的話，沒有一句不帶能力的。
+> 路加福音 1:37
+
 > **Every PR is a PrayRequest.**
 > 合併之前，先讀一段。
 
@@ -17,20 +20,23 @@ mapping:
 
 | PR pattern                            | Verse reference   | Vibe                              |
 |---------------------------------------|-------------------|-----------------------------------|
-| `hotfix:` / `urgent` / `critical`     | 馬太福音 16:26    | what does it profit a man         |
-| `refactor:` or 500+ lines / 20+ files | 啟示錄 21:5       | behold, I make all things new     |
-| `feat:` / new feature                 | 創世記 1:31       | and it was good                   |
-| `security` / `auth` / `admin` paths   | 詩篇 127:1        | except the Lord guard the city    |
-| `fix:` / `bug` / `patch`              | 詩篇 51:10        | create in me a clean heart        |
-| `revert:` / `rollback`                | 約拿書 2:2        | out of the depths I cried         |
-| `test:` / `spec`                      | 雅各書 1:3        | testing of your faith             |
-| `docs:` / `readme`                    | 提摩太後書 3:16   | all scripture is profitable       |
-| (no match)                            | 詩篇 23:4         | through the valley of the shadow  |
+| `hotfix:` / `urgent` / `critical`     | 阿摩司書 9:11         | repair the broken walls           |
+| `refactor:` or 500+ lines / 20+ files | 啟示錄 21:5           | behold, I make all things new     |
+| `feat:` / new feature                 | 創世記 1:3            | let there be light                |
+| `security` / `auth` / `admin` paths   | 以弗所書 6:11         | put on the full armour of God     |
+| `fix:` / `bug` / `patch`              | 使徒行傳 3:19         | repent and turn back              |
+| `revert:` / `rollback`                | 列王紀下 19:15        | return the way you came           |
+| `todo` / `fixme` / `hack`             | 馬太福音 7:26         | build house on sand               |
+| `test:` / `spec`                      | 雅各書 1:3            | testing of your faith             |
+| `docs:` / `readme`                    | 申命記 5:22           | written on two stone tablets      |
+| (no match)                            | 馬太福音 21:22        | have faith in prayer              |
 
 Full mapping in
 [`.github/prayrequest-verses.json`](.github/prayrequest-verses.json) —
 20 entries plus a default fallback. The matcher walks the file in
 order; **first matching tag wins**.
+
+Scripture quotes are from the Revised Chinese Union Version (和合本修訂版), © Hong Kong Bible Society. Used by permission.
 
 ---
 
@@ -38,14 +44,14 @@ order; **first matching tag wins**.
 
 A `hotfix:` PR gets:
 
-> > 人若賺得全世界，賠上自己的生命，有甚麼益處呢？
-> > — *馬太福音 16:26*
+> > 「在那日，我必重建大衛倒塌的帳幕，修補其中的缺口；我必建立那遭破壞的，重新修造，如古時一般⋯⋯」
+> > — *阿摩司書 9:11*
 >
 > *— 🙏 PrayRequest*
 
 A 500+ line `refactor:` PR gets:
 
-> > 看哪，我將一切都更新了。
+> > 那位坐在寶座上的說：「看哪，我把一切都更新了！」⋯⋯
 > > — *啟示錄 21:5*
 >
 > *— 🙏 PrayRequest*
@@ -71,7 +77,7 @@ Real reasons teams put a verse on a PR — beyond "it's funny":
   「合併之前，先讀一段」 lands as an in-joke that survives translation
   in a way English-only humor doesn't.
 - **Blameless callouts.** "PR touches `auth/middleware.ts`" plus
-  詩篇 127:1 communicates the same thing as a bluntly-worded reviewer
+  以弗所書 6:11 communicates the same thing as a bluntly-worded reviewer
   comment, but without singling anyone out. The verse is the medium;
   the targeting is implicit.
 - **Onboarding signal.** New engineers learn which kinds of PRs the
