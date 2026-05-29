@@ -1,6 +1,6 @@
 import { getInstallationToken } from "../github-auth";
-import { postComment } from "../github-api";
-import { pickVerse, formatComment } from "../verse-picker";
+import { postComment, getPullRequestCommitsOrEmpty } from "../github-api";
+import { pickVerseWithLLM, formatComment } from "../verse-picker";
 import { SUMMON_PATTERN } from "../summon";
 
 interface PullRequestEvent {
@@ -28,22 +28,26 @@ export async function handlePullRequest(event: PullRequestEvent, env: Env): Prom
 		SUMMON_PATTERN.test(event.pull_request.body ?? "");
 	if (!summoned) return;
 
-	const verse = pickVerse({
-		prTitle: event.pull_request.title,
-		additions: event.pull_request.additions,
-		changedFiles: event.pull_request.changed_files,
-	});
+	const owner = event.repository.owner.login;
+	const repo = event.repository.name;
+	const prNumber = event.pull_request.number;
 
+	// Sequential: commits needs the token, the LLM needs commits. Token is
+	// cached in github-auth.ts across webhooks for the same installation,
+	// so the warm-path hit is just the one commits round-trip (~150-300ms);
+	// cold pays ~500-600ms.
 	const token = await getInstallationToken(
 		env.GITHUB_APP_ID,
 		env.GITHUB_APP_PRIVATE_KEY,
 		event.installation.id,
 	);
-	await postComment(
-		token,
-		event.repository.owner.login,
-		event.repository.name,
-		event.pull_request.number,
-		formatComment(verse),
-	);
+	const commits = await getPullRequestCommitsOrEmpty(token, owner, repo, prNumber);
+	const verse = await pickVerseWithLLM(env.AI, {
+		prTitle: event.pull_request.title,
+		prBody: event.pull_request.body,
+		additions: event.pull_request.additions,
+		changedFiles: event.pull_request.changed_files,
+		commits,
+	});
+	await postComment(token, owner, repo, prNumber, formatComment(verse));
 }

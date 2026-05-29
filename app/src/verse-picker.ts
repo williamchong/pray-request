@@ -1,8 +1,15 @@
 import versesData from "../../.github/prayrequest-verses.json";
+import { parseRef, refsAgree } from "./bible-canon";
 
 export interface Verse {
 	verse: string;
 	ref: string;
+	// Secondary-language translation: English KJV in `alt`, with Chinese
+	// 和合本 / CUV in the primary `verse`/`ref`. Set both by the LLM path and
+	// by the keyword-matcher fallback when the curated JSON entry includes an
+	// `alt`; absent only if a curated entry omits one, in which case the
+	// comment renders mono-Chinese.
+	alt?: { verse: string; ref: string };
 }
 
 interface VersesFile {
@@ -17,6 +24,7 @@ const data = versesData as VersesFile;
 const compiledVerses = data.verses.map((v) => ({
 	verse: v.verse,
 	ref: v.ref,
+	alt: v.alt,
 	tags: v.tags,
 	patterns: v.tags.map(
 		(tag) =>
@@ -33,36 +41,265 @@ export interface VerseInput {
 	excludeRef?: string;
 }
 
-export function pickVerse({ prTitle, additions, changedFiles, excludeRef }: VerseInput): Verse {
-	const titleLc = prTitle.toLowerCase();
-	const isMassive = additions > 500 || changedFiles > 20;
+export interface LLMVerseInput extends VerseInput {
+	/** Untrusted PR description. Interpolated as LLM prompt data; exits the Worker via JSON.stringify in the AI binding. */
+	prBody: string | null;
+	/** Commit subjects. Bounded by the caller to keep the prompt small; empty when unavailable. */
+	commits: string[];
+}
 
-	if (isMassive) {
-		const massive = compiledVerses.find((v) => v.tags.includes("massive"));
-		if (massive && massive.ref !== excludeRef) {
-			return { verse: massive.verse, ref: massive.ref };
+// Generation mode: model recalls a verse freely from its training. Once we
+// have a curated verse index, this should switch to hybrid (model picks a
+// ref → we look up the canonical text from the index) so hallucinated
+// chapter:verse pairs get caught before they're posted.
+const LLM_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+
+// PRs occasionally paste 10k-line stack traces, release notes, or migration
+// scripts into the description. 1500 chars (~400 tokens) is enough prose for
+// the model to grasp intent without ballooning per-PR cost.
+const MAX_BODY_CHARS = 1500;
+
+// Bilingual output is 4 string fields + JSON punctuation. Long Chinese verses
+// (Psalm 119:105-class) hit ~120-180 tokens by themselves under Gemma's
+// tokenizer, so a 200-cap silently truncates mid-JSON and forces the keyword
+// fallback. 320 is the comfortable headroom that keeps cost well under the
+// $0.002/PR ceiling.
+const LLM_MAX_TOKENS = 320;
+
+// Worker handlers run inside `waitUntil`, so a hung Workers AI call would
+// keep the request slot alive until the platform timeout. Bound it ourselves
+// and fall through to the keyword matcher on timeout.
+const LLM_TIMEOUT_MS = 8000;
+
+function isMassiveChange(input: VerseInput): boolean {
+	return input.additions > 500 || input.changedFiles > 20;
+}
+
+const SYSTEM_PROMPT = `You are PrayRequest, a bot that comments on GitHub pull requests with a single Bible verse that thematically resonates with the change. Every comment is bilingual: Traditional Chinese (和合本 / CUV, 1919) and English (KJV / King James Version). Both translations are public-domain so the bot can quote them in full without licensing concerns.
+
+Rules:
+- Respond ONLY with valid JSON of shape:
+  {"verse_zh": "...", "ref_zh": "...", "verse_en": "...", "ref_en": "..."}
+- "verse_zh" is the verse text in the Chinese Union Version (和合本 / CUV, 1919 edition), Traditional script. Exact text — do not paraphrase, modernize, or use a later revision (do NOT use 和合本修訂版 / RCUV).
+- "ref_zh" is the canonical Chinese reference (e.g. "詩篇 23:1", "馬太福音 16:26", "羅馬書 8:28").
+- "verse_en" is the same verse in KJV (King James Version, 1611/1769). Exact text, including archaic forms (Thee/Thou/Thy, Hath/Saith). Do NOT modernize or substitute NIV/ESV phrasing.
+- "ref_en" is the same canonical reference in English (e.g. "Psalm 23:1", "Matthew 16:26", "Romans 8:28").
+- All four fields are required and must refer to the same verse.
+- No commentary, no markdown, no code fences, no editorial interpretation.
+- Choose a real verse you are confident exists. Do not invent references.
+- Match the PR's theme (fix → restoration, feat → creation, refactor → renewal, security → vigilance, docs → wisdom, test → discernment, etc.).`;
+
+// Minimal AI binding surface we depend on — accepts both the typed `Ai`
+// global from worker-configuration.d.ts and a hand-rolled fake in tests.
+export interface AiLike {
+	run(
+		model: string,
+		inputs: Record<string, unknown>,
+		options?: { signal?: AbortSignal },
+	): Promise<unknown>;
+}
+
+export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promise<Verse> {
+	try {
+		const raw = await ai.run(
+			LLM_MODEL,
+			{
+				messages: [
+					{ role: "system", content: SYSTEM_PROMPT },
+					{ role: "user", content: buildUserContent(input) },
+				],
+				temperature: 0.7,
+				max_tokens: LLM_MAX_TOKENS,
+			},
+			{ signal: AbortSignal.timeout(LLM_TIMEOUT_MS) },
+		);
+		const text = extractText(raw);
+		if (!text) return pickVerse(input);
+		const parsed = parseVerseJson(text);
+		if (!parsed) return pickVerse(input);
+		// Model occasionally re-picks the excluded ref despite the prompt; reroll
+		// loses its point if we post the same verse back, so fall through. Check
+		// both translations because the previous comment's anchor could have
+		// been set under either language.
+		if (
+			input.excludeRef &&
+			(parsed.ref === input.excludeRef || parsed.alt?.ref === input.excludeRef)
+		) {
+			return pickVerse(input);
 		}
+		return parsed;
+	} catch (err) {
+		console.warn("pickVerseWithLLM fell back to keyword matcher", err);
+		return pickVerse(input);
+	}
+}
+
+function buildUserContent(input: LLMVerseInput): string {
+	const body = (input.prBody ?? "").slice(0, MAX_BODY_CHARS).trim();
+	const sizeNote = isMassiveChange(input) ? " (large change)" : "";
+	const lines = [
+		`PR title: ${input.prTitle}`,
+		`Additions: ${input.additions}, files changed: ${input.changedFiles}${sizeNote}`,
+	];
+	if (body) lines.push(`PR description:\n${body}`);
+	if (input.commits.length > 0) {
+		lines.push(`Recent commits:\n${input.commits.map((m) => `- ${m}`).join("\n")}`);
+	}
+	if (input.excludeRef) {
+		lines.push(
+			`The reader did not connect with "${input.excludeRef}". Pick a different verse on a related but distinct theme.`,
+		);
+	}
+	return lines.join("\n\n");
+}
+
+// Workers AI returns OpenAI-shaped chat completions for Gemma 4
+// (`choices[0].message.content`). Older `BaseAiTextGeneration` models return
+// `{ response: string }`. Accept both so a future model swap doesn't break.
+function extractText(raw: unknown): string | null {
+	if (typeof raw === "string") return raw;
+	if (typeof raw !== "object" || raw === null) return null;
+	const r = raw as {
+		response?: unknown;
+		choices?: Array<{ message?: { content?: unknown } }>;
+	};
+	if (typeof r.response === "string") return r.response;
+	const content = r.choices?.[0]?.message?.content;
+	return typeof content === "string" ? content : null;
+}
+
+export function parseVerseJson(raw: string): Verse | null {
+	// Strip ``` fences models sometimes add despite the no-markdown instruction.
+	const fenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+	// Non-greedy: parse only the first {...} when the model emits prose
+	// around the JSON or two candidate objects.
+	const match = fenced.match(/\{[\s\S]*?\}/);
+	if (!match) return null;
+	let obj: unknown;
+	try {
+		obj = JSON.parse(match[0]);
+	} catch {
+		return null;
+	}
+	if (typeof obj !== "object" || obj === null) return null;
+	// Bilingual is the expected shape; mono is a regression-safety net so a
+	// stripped-down model response still produces a postable comment.
+	const primary = extractPair(obj, "verse_zh", "ref_zh");
+	const alt = extractPair(obj, "verse_en", "ref_en");
+	if (primary && alt) {
+		// Both refs validated against the canon individually in extractPair;
+		// here we cross-check they name the same verse so a prompt-drifting
+		// model that pairs 詩篇 23:1 with Matthew 5:1 falls through.
+		if (!refsAgree(primary.ref, alt.ref)) return null;
+		return { ...primary, alt };
+	}
+	return extractPair(obj, "verse", "ref");
+}
+
+function validVerseText(v: unknown): string | null {
+	if (typeof v !== "string") return null;
+	const t = v.trim();
+	if (t.length < 5 || t.length > 500) return null;
+	// Untrusted LLM output gets interpolated into formatComment's markdown
+	// with no escaping. Reject:
+	// - newlines (break out of the blockquote into raw markdown — fake bot
+	//   signatures, phishing links)
+	// - @ (GitHub renders @-mentions inside blockquotes; the bot's own
+	//   comment could ping @victim from a malicious model output)
+	// - [ ] (form markdown link/image syntax: [text](url), ![alt](url) —
+	//   phishing link and tracking-pixel injection)
+	// - < (forms HTML tags — GitHub renders <img>, <a>, <details> inside
+	//   blockquotes; also catches <!-- which would spoof the trailing
+	//   prayrequest:ref anchor extractRefFromBody parses for reroll)
+	// - --> (orphan HTML-comment close; defense-in-depth for the < rule)
+	// - http(s):// / www. (GitHub auto-links raw URLs inside blockquotes)
+	// Parens are deliberately allowed — verses use parenthetical notes
+	// occasionally, and the link/image attacks are already defeated by
+	// killing brackets. False-positive avoidance over symmetry.
+	if (/[\r\n@\[\]<]|-->|https?:\/\/|www\./i.test(t)) return null;
+	return t;
+}
+
+// Canon validation rejects unknown book names and out-of-bounds chapters —
+// strictly tighter than the old shape-only regex, which let hallucinated
+// books like "Hezekiah 3:14" through to the BibleGateway link layer.
+function validRef(r: unknown): string | null {
+	if (typeof r !== "string") return null;
+	const t = r.trim();
+	return parseRef(t) !== null ? t : null;
+}
+
+function extractPair(
+	obj: object,
+	verseKey: string,
+	refKey: string,
+): { verse: string; ref: string } | null {
+	const o = obj as Record<string, unknown>;
+	const verse = validVerseText(o[verseKey]);
+	if (verse === null) return null;
+	const ref = validRef(o[refKey]);
+	if (ref === null) return null;
+	return { verse, ref };
+}
+
+// Strips internal fields (tags, patterns) and returns just the public Verse
+// shape. Propagates `alt` so the keyword fallback renders bilingual when the
+// curated JSON entry has CUV + KJV.
+function toVerse(v: { verse: string; ref: string; alt?: Verse["alt"] }): Verse {
+	return v.alt ? { verse: v.verse, ref: v.ref, alt: v.alt } : { verse: v.verse, ref: v.ref };
+}
+
+export function pickVerse(input: VerseInput): Verse {
+	const { prTitle, excludeRef } = input;
+	const titleLc = prTitle.toLowerCase();
+
+	if (isMassiveChange(input)) {
+		const massive = compiledVerses.find((v) => v.tags.includes("massive"));
+		if (massive && massive.ref !== excludeRef) return toVerse(massive);
 	}
 
 	for (const v of compiledVerses) {
 		if (v.ref === excludeRef) continue;
-		if (v.patterns.some((p) => p.test(titleLc))) {
-			return { verse: v.verse, ref: v.ref };
-		}
+		if (v.patterns.some((p) => p.test(titleLc))) return toVerse(v);
 	}
 
-	if (data.default.ref !== excludeRef) {
-		return { verse: data.default.verse, ref: data.default.ref };
-	}
+	if (data.default.ref !== excludeRef) return toVerse(data.default);
 
 	const fallback = compiledVerses.find((v) => v.ref !== excludeRef);
-	if (fallback) return { verse: fallback.verse, ref: fallback.ref };
-	return { verse: data.default.verse, ref: data.default.ref };
+	if (fallback) return toVerse(fallback);
+	return toVerse(data.default);
+}
+
+// Map each comment language to the BibleGateway version code we prompted
+// the LLM for. Keep in sync with SYSTEM_PROMPT's translation rules: the
+// Chinese slot is 和合本 (CUV, 1919) and the English slot is KJV. Both
+// public-domain — see SYSTEM_PROMPT for the matching translation contract.
+const GATEWAY_VERSIONS = { zh: "CUV", en: "KJV" } as const;
+
+export function verseGatewayUrl(ref: string, lang: keyof typeof GATEWAY_VERSIONS): string {
+	const params = new URLSearchParams({ search: ref, version: GATEWAY_VERSIONS[lang] });
+	return `https://www.biblegateway.com/passage/?${params}`;
+}
+
+function renderRefBlock(verse: string, ref: string, lang: keyof typeof GATEWAY_VERSIONS): string {
+	return `> ${verse}\n> — *[${ref}](${verseGatewayUrl(ref, lang)})*`;
 }
 
 // Trailing HTML comment is the canonical anchor for reroll's exclude-ref
 // lookup. Parsing visible markdown back out (the > —*ref* line) would
-// silently break if formatting ever changes.
-export function formatComment({ verse, ref }: Verse): string {
-	return `> ${verse}\n> — *${ref}*\n\n*— 🙏 PrayRequest*\n<!-- prayrequest:ref=${ref} -->`;
+// silently break if formatting ever changes. The anchor uses the primary
+// ref so it's stable across mono fallback and bilingual paths.
+//
+// Refs are markdown-linked to BibleGateway. The alt slot is always KJV
+// per the bilingual contract; the primary slot derives its version from
+// parseRef's matched language (CUV when the canon's Chinese map hit,
+// KJV when the English map hit) so a mono-English LLM fallback doesn't
+// render English text under a Chinese-version link. Falls back to CUV when
+// parseRef fails — the keyword-matcher fallback only emits CJK refs.
+export function formatComment(v: Verse): string {
+	const primaryLang = parseRef(v.ref)?.lang ?? "zh";
+	const blocks = [renderRefBlock(v.verse, v.ref, primaryLang)];
+	if (v.alt) blocks.push(renderRefBlock(v.alt.verse, v.alt.ref, "en"));
+	blocks.push("*— 🙏 PrayRequest*");
+	return `${blocks.join("\n\n")}\n<!-- prayrequest:ref=${v.ref} -->`;
 }

@@ -1,198 +1,192 @@
 {
   "verses": [
     {
-      "tags": [
-        "hotfix",
-        "urgent",
-        "emergency",
-        "asap",
-        "critical"
-      ],
-      "verse": "「在那日，我必重建大衛倒塌的帳幕，修補其中的缺口；我必建立那遭破壞的，重新修造，如古時一般⋯⋯」",
-      "ref": "阿摩司書 9:11"
+      "tags": ["hotfix", "urgent", "emergency", "asap", "critical"],
+      "verse": "到那日，我必建立大衛倒塌的帳幕，堵住其中的破口，把那破壞的建立起來，重新修造，像古時一樣。",
+      "ref": "阿摩司書 9:11",
+      "alt": {
+        "verse": "In that day will I raise up the tabernacle of David that is fallen, and close up the breaches thereof; and I will raise up his ruins, and I will build it as in the days of old.",
+        "ref": "Amos 9:11"
+      }
     },
     {
-      "tags": [
-        "security",
-        "auth",
-        "jwt",
-        "permission",
-        "admin",
-        "secret"
-      ],
-      "verse": "要穿戴神所賜的全副軍裝，好抵擋魔鬼的詭計。",
-      "ref": "以弗所書 6:11"
+      "tags": ["security", "auth", "jwt", "permission", "admin", "secret"],
+      "verse": "要穿戴神所賜的全副軍裝，就能抵擋魔鬼的詭計。",
+      "ref": "以弗所書 6:11",
+      "alt": {
+        "verse": "Put on the whole armour of God, that ye may be able to stand against the wiles of the devil.",
+        "ref": "Ephesians 6:11"
+      }
     },
     {
-      "tags": [
-        "revert",
-        "rollback",
-        "undo"
-      ],
-      "verse": "耶和華對他說：「去吧，從原路回去，往大馬士革的曠野去。...",
-      "ref": "列王紀下 19:15"
+      "tags": ["revert", "rollback", "undo"],
+      "verse": "耶和華對他說：你回去，從曠野往大馬士革去。到了那裏，就要膏哈薛作亞蘭王。",
+      "ref": "列王紀上 19:15",
+      "alt": {
+        "verse": "And the LORD said unto him, Go, return on thy way to the wilderness of Damascus: and when thou comest, anoint Hazael to be king over Syria.",
+        "ref": "1 Kings 19:15"
+      }
     },
     {
-      "tags": [
-        "todo",
-        "fixme",
-        "hack"
-      ],
-      "verse": "凡聽了我這些話而不去做的，好比一個無知的人把房子蓋在沙土上。",
-      "ref": "馬太福音 7:26"
+      "tags": ["todo", "fixme", "hack"],
+      "verse": "凡聽見我這話不去行的，好比一個無知的人，把房子蓋在沙土上。",
+      "ref": "馬太福音 7:26",
+      "alt": {
+        "verse": "And every one that heareth these sayings of mine, and doeth them not, shall be likened unto a foolish man, which built his house upon the sand.",
+        "ref": "Matthew 7:26"
+      }
     },
     {
-      "tags": [
-        "refactor",
-        "rewrite",
-        "rework",
-        "massive"
-      ],
-      "verse": "那位坐在寶座上的說：「看哪，我把一切都更新了！」⋯⋯",
-      "ref": "啟示錄 21:5"
+      "tags": ["refactor", "rewrite", "rework", "massive"],
+      "verse": "坐寶座的說：看哪，我將一切都更新了！又說：你要寫上；因這些話是可信的，是真實的。",
+      "ref": "啟示錄 21:5",
+      "alt": {
+        "verse": "And he that sat upon the throne said, Behold, I make all things new. And he said unto me, Write: for these words are true and faithful.",
+        "ref": "Revelation 21:5"
+      }
     },
     {
-      "tags": [
-        "release",
-        "version"
-      ],
-      "verse": "看哪，我要行一件新事，如今就要顯明，你們豈不知道嗎？我必在曠野開道路，在沙漠開江河。",
-      "ref": "以賽亞書 43:19"
+      "tags": ["release", "version"],
+      "verse": "看哪，我要做一件新事，如今要發現，你們豈不知道嗎？我必在曠野開道路，在沙漠開江河。",
+      "ref": "以賽亞書 43:19",
+      "alt": {
+        "verse": "Behold, I will do a new thing; now it shall spring forth; shall ye not know it? I will even make a way in the wilderness, and rivers in the desert.",
+        "ref": "Isaiah 43:19"
+      }
     },
     {
-      "tags": [
-        "perf",
-        "performance",
-        "optimize",
-        "speed"
-      ],
-      "verse": "他使我的腳快如母鹿，使我站穩在高處。",
-      "ref": "詩篇 18:33"
+      "tags": ["perf", "performance", "optimize", "speed"],
+      "verse": "他使我的腳快如母鹿的蹄，又使我在高處安穩。",
+      "ref": "詩篇 18:33",
+      "alt": {
+        "verse": "He maketh my feet like hinds' feet, and setteth me upon my high places.",
+        "ref": "Psalm 18:33"
+      }
     },
     {
-      "tags": [
-        "test",
-        "tests",
-        "spec"
-      ],
-      "verse": "因為知道你們的信心經過考驗，就生忍耐。",
-      "ref": "雅各書 1:3"
+      "tags": ["test", "tests", "spec"],
+      "verse": "因為知道你們的信心經過試驗，就生忍耐。",
+      "ref": "雅各書 1:3",
+      "alt": {
+        "verse": "Knowing this, that the trying of your faith worketh patience.",
+        "ref": "James 1:3"
+      }
     },
     {
-      "tags": [
-        "deps",
-        "dependencies",
-        "bump",
-        "upgrade"
-      ],
-      "verse": "耶和華是我的牧者，我必不致缺乏。",
-      "ref": "詩篇 23:1"
+      "tags": ["deps", "dependencies", "bump", "upgrade"],
+      "verse": "耶和華是我的牧者，我必不至缺乏。",
+      "ref": "詩篇 23:1",
+      "alt": {
+        "verse": "The LORD is my shepherd; I shall not want.",
+        "ref": "Psalm 23:1"
+      }
     },
     {
-      "tags": [
-        "config",
-        "yaml",
-        "env",
-        "configuration"
-      ],
-      "verse": "你們哪一個要蓋一座樓，不先坐下來計算費用，看能不能蓋成？",
-      "ref": "路加福音 14:28"
+      "tags": ["config", "yaml", "env", "configuration"],
+      "verse": "你們哪一個要蓋一座樓，不先坐下算計花費，能蓋成不能呢？",
+      "ref": "路加福音 14:28",
+      "alt": {
+        "verse": "For which of you, intending to build a tower, sitteth not down first, and counteth the cost, whether he have sufficient to finish it?",
+        "ref": "Luke 14:28"
+      }
     },
     {
-      "tags": [
-        "ci",
-        "workflow",
-        "pipeline"
-      ],
-      "verse": "靠著他全身都連接得緊湊，百節各按各職，照著各體的功用彼此相助，使身體漸漸增長，在愛中建立自己。",
-      "ref": "以弗所書 4:16"
+      "tags": ["ci", "workflow", "pipeline"],
+      "verse": "全身都靠他聯絡得合式，百節各按各職，照著各體的功用彼此相助，便叫身體漸漸增長，在愛中建立自己。",
+      "ref": "以弗所書 4:16",
+      "alt": {
+        "verse": "From whom the whole body fitly joined together and compacted by that which every joint supplieth, according to the effectual working in the measure of every part, maketh increase of the body unto the edifying of itself in love.",
+        "ref": "Ephesians 4:16"
+      }
     },
     {
-      "tags": [
-        "style",
-        "format",
-        "lint",
-        "prettier"
-      ],
+      "tags": ["style", "format", "lint", "prettier"],
       "verse": "凡事都要規規矩矩地按著次序行。",
-      "ref": "哥林多前書 14:40"
+      "ref": "哥林多前書 14:40",
+      "alt": {
+        "verse": "Let all things be done decently and in order.",
+        "ref": "1 Corinthians 14:40"
+      }
     },
     {
-      "tags": [
-        "delete",
-        "remove",
-        "drop",
-        "deprecate"
-      ],
-      "verse": "我實實在在地告訴你們，一粒麥子不落在地裏死了，仍舊是一粒；若是死了，就結出許多子粒來。",
-      "ref": "約翰福音 12:24"
+      "tags": ["delete", "remove", "drop", "deprecate"],
+      "verse": "我實實在在地告訴你們，一粒麥子不落在地裏死了，仍舊是一粒，若是死了，就結出許多子粒來。",
+      "ref": "約翰福音 12:24",
+      "alt": {
+        "verse": "Verily, verily, I say unto you, Except a corn of wheat fall into the ground and die, it abideth alone: but if it die, it bringeth forth much fruit.",
+        "ref": "John 12:24"
+      }
     },
     {
-      "tags": [
-        "merge",
-        "integrate",
-        "combine"
-      ],
-      "verse": "兩個人總比一個人好，他們勞碌同得美好的報償。",
-      "ref": "傳道書 4:9"
+      "tags": ["merge", "integrate", "combine"],
+      "verse": "兩個人總比一個人好，因為二人勞碌同得美好的果效。",
+      "ref": "傳道書 4:9",
+      "alt": {
+        "verse": "Two are better than one; because they have a good reward for their labour.",
+        "ref": "Ecclesiastes 4:9"
+      }
     },
     {
-      "tags": [
-        "docs",
-        "doc",
-        "documentation",
-        "readme"
-      ],
-      "verse": "「這些話是耶和華在山上，從火焰、密雲、幽暗中，大聲吩咐你們全會眾的，再沒有加添別的話了。他把這些話寫在兩塊石版上，交給我。",
-      "ref": "申命記 5:22"
+      "tags": ["docs", "doc", "documentation", "readme"],
+      "verse": "這些話是耶和華在山上，從火中、雲中、幽暗中，大聲曉諭你們全會眾的；此外並沒有添別的話。他就把這話寫在兩塊石版上，交給我了。",
+      "ref": "申命記 5:22",
+      "alt": {
+        "verse": "These words the LORD spake unto all your assembly in the mount out of the midst of the fire, of the cloud, and of the thick darkness, with a great voice: and he added no more. And he wrote them in two tables of stone, and delivered them unto me.",
+        "ref": "Deuteronomy 5:22"
+      }
     },
     {
-      "tags": [
-        "typo",
-        "rename"
-      ],
-      "verse": "神對他說：「你的名原是雅各，從今以後不要再叫雅各，你的名要叫以色列。」於是，神就叫他的名為以色列。",
-      "ref": "創世記 35:10"
+      "tags": ["typo", "rename"],
+      "verse": "神對他說：你的名原是雅各，從今以後不要再叫雅各，要叫以色列。這樣，他就改名叫以色列。",
+      "ref": "創世記 35:10",
+      "alt": {
+        "verse": "And God said unto him, Thy name is Jacob: thy name shall not be called any more Jacob, but Israel shall be thy name: and he called his name Israel.",
+        "ref": "Genesis 35:10"
+      }
     },
     {
-      "tags": [
-        "draft",
-        "wip"
-      ],
-      "verse": "我深信，那在你們心裏動了美好工作的，到了耶穌基督的日子必完成這工作。",
-      "ref": "腓立比書 1:6"
+      "tags": ["draft", "wip"],
+      "verse": "我深信那在你們心裏動了善工的，必成全這工，直到耶穌基督的日子。",
+      "ref": "腓立比書 1:6",
+      "alt": {
+        "verse": "Being confident of this very thing, that he which hath begun a good work in you will perform it until the day of Jesus Christ.",
+        "ref": "Philippians 1:6"
+      }
     },
     {
-      "tags": [
-        "chore",
-        "cleanup",
-        "tidy"
-      ],
-      "verse": "凡事都有定期，天下每一事務都有定時。",
-      "ref": "傳道書 3:1"
+      "tags": ["chore", "cleanup", "tidy"],
+      "verse": "凡事都有定期，天下萬務都有定時。",
+      "ref": "傳道書 3:1",
+      "alt": {
+        "verse": "To every thing there is a season, and a time to every purpose under the heaven.",
+        "ref": "Ecclesiastes 3:1"
+      }
     },
     {
-      "tags": [
-        "fix",
-        "bug",
-        "patch"
-      ],
-      "verse": "所以，你們當悔改歸正，使你們的罪得以塗去⋯⋯",
-      "ref": "使徒行傳 3:19"
+      "tags": ["fix", "bug", "patch"],
+      "verse": "所以，你們當悔改歸正，使你們的罪得以塗抹。",
+      "ref": "使徒行傳 3:19",
+      "alt": {
+        "verse": "Repent ye therefore, and be converted, that your sins may be blotted out, when the times of refreshing shall come from the presence of the Lord.",
+        "ref": "Acts 3:19"
+      }
     },
     {
-      "tags": [
-        "feat",
-        "feature",
-        "add",
-        "introduce"
-      ],
-      "verse": "神說：「要有光」，就有了光。",
-      "ref": "創世記 1:3"
+      "tags": ["feat", "feature", "add", "introduce"],
+      "verse": "神說：要有光，就有了光。",
+      "ref": "創世記 1:3",
+      "alt": {
+        "verse": "And God said, Let there be light: and there was light.",
+        "ref": "Genesis 1:3"
+      }
     }
   ],
   "default": {
-    "verse": "「⋯⋯你們禱告，無論求甚麼，只要信，就必得著。」",
-    "ref": "馬太福音 21:22"
+    "verse": "你們禱告，無論求甚麼，只要信，就必得著。",
+    "ref": "馬太福音 21:22",
+    "alt": {
+      "verse": "And all things, whatsoever ye shall ask in prayer, believing, ye shall receive.",
+      "ref": "Matthew 21:22"
+    }
   }
 }

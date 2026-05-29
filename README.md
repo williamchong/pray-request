@@ -36,7 +36,7 @@ Full mapping in
 20 entries plus a default fallback. The matcher walks the file in
 order; **first matching tag wins**.
 
-Scripture quotes are from the Revised Chinese Union Version (和合本修訂版), © Hong Kong Bible Society. Used by permission.
+Scripture quotes are intended to use public-domain translations: Chinese Union Version (和合本, 1919) for Traditional Chinese and the King James Version (1611/1769) for English. Please verify copyright status and any attribution requirements for your jurisdiction before deploying.
 
 ---
 

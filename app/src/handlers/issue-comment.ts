@@ -3,9 +3,10 @@ import {
 	postComment,
 	findLastBotComment,
 	getPullRequest,
+	getPullRequestCommitsOrEmpty,
 	extractRefFromBody,
 } from "../github-api";
-import { pickVerse, formatComment } from "../verse-picker";
+import { pickVerseWithLLM, formatComment } from "../verse-picker";
 import { SUMMON_PATTERN, REROLL_PATTERN, BOT_LOGIN_PREFIX } from "../summon";
 
 interface IssueCommentEvent {
@@ -43,19 +44,22 @@ export async function handleIssueComment(event: IssueCommentEvent, env: Env): Pr
 		event.installation.id,
 	);
 
-	const [pr, last] = await Promise.all([
+	const [pr, last, commits] = await Promise.all([
 		getPullRequest(token, owner, repo, issueNumber),
 		isReroll
 			? findLastBotComment(token, owner, repo, issueNumber, BOT_LOGIN_PREFIX)
 			: Promise.resolve(null),
+		getPullRequestCommitsOrEmpty(token, owner, repo, issueNumber),
 	]);
 
 	const excludeRef = last ? (extractRefFromBody(last.body) ?? undefined) : undefined;
 
-	const verse = pickVerse({
+	const verse = await pickVerseWithLLM(env.AI, {
 		prTitle: pr.title,
+		prBody: pr.body,
 		additions: pr.additions,
 		changedFiles: pr.changed_files,
+		commits,
 		excludeRef,
 	});
 
