@@ -16,12 +16,12 @@ describe("pickVerse", () => {
 
 	it("matches hotfix tag", () => {
 		const v = pickVerse({ prTitle: "hotfix: payment timeout", additions: 5, changedFiles: 1 });
-		expect(v.ref).toBe("馬太福音 16:26");
+		expect(v.ref).toBe("阿摩司書 9:11");
 	});
 
 	it("matches security via auth keyword", () => {
 		const v = pickVerse({ prTitle: "fix: auth bypass", additions: 5, changedFiles: 1 });
-		expect(v.ref).toBe("詩篇 127:1");
+		expect(v.ref).toBe("以弗所書 6:11");
 	});
 
 	it("word-boundary: 'fix' does not match 'prefix'", () => {
@@ -36,7 +36,7 @@ describe("pickVerse", () => {
 
 	it("falls back to default when nothing matches", () => {
 		const v = pickVerse({ prTitle: "miscellaneous changes", additions: 5, changedFiles: 1 });
-		expect(v.ref).toBe("詩篇 23:4");
+		expect(v.ref).toBe("馬太福音 21:22");
 	});
 
 	it("excludeRef skips the matched verse and falls through", () => {
@@ -44,9 +44,9 @@ describe("pickVerse", () => {
 			prTitle: "hotfix: urgent",
 			additions: 5,
 			changedFiles: 1,
-			excludeRef: "馬太福音 16:26",
+			excludeRef: "阿摩司書 9:11",
 		});
-		expect(v.ref).not.toBe("馬太福音 16:26");
+		expect(v.ref).not.toBe("阿摩司書 9:11");
 	});
 });
 
