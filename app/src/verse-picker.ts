@@ -52,24 +52,36 @@ export interface LLMVerseInput extends VerseInput {
 // have a curated verse index, this should switch to hybrid (model picks a
 // ref → we look up the canonical text from the index) so hallucinated
 // chapter:verse pairs get caught before they're posted.
-const LLM_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+//
+// Claude Haiku 4.5, reached through the same `env.AI` binding (Cloudflare
+// proxies anthropic/* models — no separate API key, but the account must have
+// Unified Billing enabled or the call errors "2021: Invalid User Credentials").
+// Chosen over the cheap Workers AI reasoning models because their
+// Traditional-CUV recall was unreliable and — the non-obvious part — the
+// native binding silently drops the params that would tame their thinking
+// (reasoning_effort / response_format / guided_json), so they spent the whole
+// token budget reasoning and returned content:null. Haiku has no reasoning
+// trap, for ~$0.0018/PR. Response is Anthropic Messages-shaped
+// (content:[{text}]); see extractText.
+const LLM_MODEL = "anthropic/claude-haiku-4.5";
 
 // PRs occasionally paste 10k-line stack traces, release notes, or migration
 // scripts into the description. 1500 chars (~400 tokens) is enough prose for
 // the model to grasp intent without ballooning per-PR cost.
 const MAX_BODY_CHARS = 1500;
 
-// Bilingual output is 4 string fields + JSON punctuation. Long Chinese verses
-// (Psalm 119:105-class) hit ~120-180 tokens by themselves under Gemma's
-// tokenizer, so a 200-cap silently truncates mid-JSON and forces the keyword
-// fallback. 320 is the comfortable headroom that keeps cost well under the
-// $0.002/PR ceiling.
-const LLM_MAX_TOKENS = 320;
+// Caps Haiku's output. The bilingual answer is 4 string fields (~150-200
+// tokens; long Chinese verses hit ~120-180 by themselves). Haiku emits the
+// JSON directly with no reasoning trace to budget for, so 512 is comfortable
+// headroom and keeps cost ~$0.0018/PR, under the $0.002 ceiling.
+const LLM_MAX_TOKENS = 512;
 
-// Worker handlers run inside `waitUntil`, so a hung Workers AI call would
-// keep the request slot alive until the platform timeout. Bound it ourselves
-// and fall through to the keyword matcher on timeout.
-const LLM_TIMEOUT_MS = 8000;
+// Worker handlers run inside `waitUntil`, so a hung model call would keep the
+// request slot alive until the platform timeout. Bound it ourselves and fall
+// through to the keyword matcher on timeout. Haiku typically answers in a
+// couple seconds; 10s is generous headroom without leaving a stuck request
+// hanging.
+const LLM_TIMEOUT_MS = 10000;
 
 function isMassiveChange(input: VerseInput): boolean {
 	return input.additions > 500 || input.changedFiles > 20;
@@ -104,19 +116,34 @@ export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promis
 		const raw = await ai.run(
 			LLM_MODEL,
 			{
-				messages: [
-					{ role: "system", content: SYSTEM_PROMPT },
-					{ role: "user", content: buildUserContent(input) },
-				],
+				// Anthropic Messages shape: the system prompt is a top-level
+				// `system` field, not a system-role message. `messages` carries
+				// only the user turn.
+				system: SYSTEM_PROMPT,
+				messages: [{ role: "user", content: buildUserContent(input) }],
 				temperature: 0.7,
 				max_tokens: LLM_MAX_TOKENS,
 			},
 			{ signal: AbortSignal.timeout(LLM_TIMEOUT_MS) },
 		);
 		const text = extractText(raw);
-		if (!text) return pickVerse(input);
+		// These three branches all fall back to the keyword matcher, which emits
+		// the same bilingual shape as a real LLM pick — so without a log they're
+		// indistinguishable from success. Log raw/text on the parse failures
+		// (the single most useful artifact when the model misbehaves). Server-side
+		// only; model output is never interpolated back into a posted comment.
+		if (!text) {
+			// JSON.stringify so nested response objects aren't truncated to
+			// `[Object]` by the log inspector — we need the full shape to see
+			// why no text came back (unexpected response format, empty content).
+			console.warn("pickVerseWithLLM: no text extracted from model response", JSON.stringify(raw));
+			return pickVerse(input);
+		}
 		const parsed = parseVerseJson(text);
-		if (!parsed) return pickVerse(input);
+		if (!parsed) {
+			console.warn("pickVerseWithLLM: unparseable or invalid verse JSON", { text });
+			return pickVerse(input);
+		}
 		// Model occasionally re-picks the excluded ref despite the prompt; reroll
 		// loses its point if we post the same verse back, so fall through. Check
 		// both translations because the previous comment's anchor could have
@@ -125,11 +152,16 @@ export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promis
 			input.excludeRef &&
 			(parsed.ref === input.excludeRef || parsed.alt?.ref === input.excludeRef)
 		) {
+			console.warn("pickVerseWithLLM: model re-picked excluded ref, falling back", {
+				ref: parsed.ref,
+				excludeRef: input.excludeRef,
+			});
 			return pickVerse(input);
 		}
+		console.log("pickVerseWithLLM: LLM verse selected", { ref: parsed.ref });
 		return parsed;
 	} catch (err) {
-		console.warn("pickVerseWithLLM fell back to keyword matcher", err);
+		console.warn("pickVerseWithLLM: fell back to keyword matcher (error)", err);
 		return pickVerse(input);
 	}
 }
@@ -153,16 +185,25 @@ function buildUserContent(input: LLMVerseInput): string {
 	return lines.join("\n\n");
 }
 
-// Workers AI returns OpenAI-shaped chat completions for Gemma 4
-// (`choices[0].message.content`). Older `BaseAiTextGeneration` models return
-// `{ response: string }`. Accept both so a future model swap doesn't break.
+// Normalizes the three response shapes we may see across model families:
+// - Anthropic Messages (claude-* proxied): `content` is an array of blocks;
+//   the text block holds the answer. This is the current LLM_MODEL's shape.
+// - OpenAI chat completions (`choices[0].message.content`) — Workers AI native
+//   text models and the OpenAI-compatible endpoint.
+// - Legacy `BaseAiTextGeneration` (`{ response: string }`).
+// Accepting all three means a future model swap doesn't break extraction.
 function extractText(raw: unknown): string | null {
 	if (typeof raw === "string") return raw;
 	if (typeof raw !== "object" || raw === null) return null;
 	const r = raw as {
 		response?: unknown;
+		content?: Array<{ text?: unknown }>;
 		choices?: Array<{ message?: { content?: unknown } }>;
 	};
+	if (Array.isArray(r.content)) {
+		const block = r.content.find((b) => typeof b?.text === "string");
+		if (block) return block.text as string;
+	}
 	if (typeof r.response === "string") return r.response;
 	const content = r.choices?.[0]?.message?.content;
 	return typeof content === "string" ? content : null;

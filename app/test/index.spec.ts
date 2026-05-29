@@ -424,6 +424,19 @@ describe("pickVerseWithLLM", () => {
 		expect(v.ref).toBe("羅馬書 8:28");
 		expect(v.alt?.ref).toBe("Romans 8:28");
 	});
+
+	it("accepts the Anthropic Messages content-block shape (claude-* proxied)", async () => {
+		const ai = fakeAi({ content: [{ type: "text", text: bilingualContent }] });
+		const v = await pickVerseWithLLM(ai, {
+			prTitle: "feat: add feature",
+			prBody: null,
+			additions: 5,
+			changedFiles: 1,
+			commits: [],
+		});
+		expect(v.ref).toBe("羅馬書 8:28");
+		expect(v.alt?.ref).toBe("Romans 8:28");
+	});
 });
 
 describe("verseGatewayUrl", () => {
