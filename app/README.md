@@ -1,11 +1,13 @@
 # PrayRequest GitHub App
 
 The hosted Worker that powers the `@prayrequest` bot. Cloudflare Workers
-+ TypeScript + Hono. Receives GitHub webhooks, picks a verse via the
-keyword matcher, and posts a comment as the App's bot user.
++ TypeScript + Hono. Receives GitHub webhooks, picks a verse with Claude
+Haiku 4.5 (via the Workers AI binding), and posts a comment as the App's
+bot user.
 
-> No LLM yet. v1 will swap `pickVerse` in `src/verse-picker.ts` for a
-> Claude API call.
+> Verse selection is LLM-driven (`pickVerseWithLLM` in
+> `src/verse-picker.ts`); the curated keyword matcher (`pickVerse`) is the
+> fallback when the model call fails, times out, or returns an invalid ref.
 
 ---
 
@@ -17,7 +19,7 @@ keyword matcher, and posts a comment as the App's bot user.
 | `src/verify.ts` | HMAC-SHA256 verification of `X-Hub-Signature-256` |
 | `src/github-auth.ts` | App JWT (RS256 via `jose`) → installation token, with per-isolate cache |
 | `src/github-api.ts` | `postComment`, `findLastBotComment`, `getPullRequest`, `extractRefFromBody` |
-| `src/verse-picker.ts` | Loads `../../.github/prayrequest-verses.json` and matches PR title against tag arrays (word-boundary, JSON-order priority, massive-diff override). |
+| `src/verse-picker.ts` | `pickVerseWithLLM` (Claude Haiku 4.5 via `env.AI`) + `pickVerse` keyword fallback (loads `../../.github/prayrequest-verses.json`; word-boundary, JSON-order priority, massive-diff override). Validates refs against `bible-canon.ts`. |
 | `src/handlers/pull-request.ts` | Auto-bless on `opened` / `ready_for_review` |
 | `src/handlers/issue-comment.ts` | `@prayrequest` summon, `@prayrequest reroll` |
 | `test/index.spec.ts` | Verse-picker parity tests (vitest) |
@@ -59,6 +61,14 @@ npx wrangler secret put GITHUB_APP_ID            # paste the numeric App ID
 npx wrangler secret put GITHUB_WEBHOOK_SECRET    # paste the random string from step 1
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY < app-pkcs8.pem
 ```
+
+> **Enable Unified Billing for the LLM.** Verse selection calls the proxied
+> `anthropic/claude-haiku-4.5` model through the Workers AI `env.AI` binding.
+> Proxied (non-`@cf/`) models route through AI Gateway and require **Unified
+> Billing** enabled on your Cloudflare account (Dashboard → **AI → AI
+> Gateway**) — without it the call errors `2021: Invalid User Credentials` and
+> the bot silently falls back to the keyword matcher. ~$0.0018/PR. No API key
+> of your own is needed; Cloudflare manages the provider credentials.
 
 ### 3. Deploy
 
@@ -134,6 +144,15 @@ redelivery storms.
 opt-in and noisy, and a 500 on every retry would mask the real error
 in logs.
 
+**LLM verse selection.** `pickVerseWithLLM` calls `anthropic/claude-haiku-4.5`
+via `env.AI` and falls back to the keyword matcher on any failure. Each
+branch logs a distinct line — grep `pickVerseWithLLM:` in `wrangler tail`
+(`LLM verse selected` = real pick; the rest = fallback). Two Workers AI
+gotchas worth knowing before swapping models: the native `env.AI.run()`
+binding **silently ignores** OpenAI-style control params (`reasoning_effort`,
+`response_format`, `guided_json` — only honored on `/v1/chat/completions`),
+and proxied `anthropic/*`/`google/*` models need Unified Billing (see setup).
+
 **Daily comment cap.** Not implemented yet. Required per
 `docs/plan.md`; will land as a Cloudflare KV-backed counter
 (`prayrequest:cap:<repo>:<yyyy-mm-dd>`) in a follow-up.
@@ -155,6 +174,10 @@ comment's body and excluded from the next pick.
 - Outbound GitHub API calls: 1 per auto-bless (post comment, after
   cached token), 2–3 per summon/reroll (get PR + post + maybe list
   comments). Far below the 5,000/hr per-installation rate limit.
+- LLM: one Claude Haiku 4.5 call per verse (~500 in / ~250 out tokens),
+  billed through Workers AI Unified Billing at ~$0.0018/PR — under the
+  plan's ~$0.002/PR ceiling. No prompt caching yet. The daily per-repo
+  comment cap (still TODO) is the real runaway-cost guard.
 
 ---
 
@@ -167,4 +190,4 @@ comment's body and excluded from the next pick.
 - `ctx.waitUntil` for post-response async work fits the webhook model.
 - One file (`wrangler.jsonc`) of infra config, vs Dockerfile + healthcheck.
 
-The whole bundle is ~28 KiB gzipped.
+The whole bundle is ~34 KiB gzipped.

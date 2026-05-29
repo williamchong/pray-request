@@ -15,7 +15,7 @@ readers interpret it however they want.
 |---|---|
 | **What** | GitHub bot that comments a Bible verse on PRs, matched to the PR's context |
 | **Why** | Team's YOLO-PR culture has no artifact. Canonize the vibe. |
-| **How** | GitHub App on Cloudflare Workers → Claude API → POST comment |
+| **How** | GitHub App on Cloudflare Workers → Claude Haiku 4.5 (Workers AI binding) → POST comment |
 | **Cost** | ~$0.002 per PR. ~$2/month at 1,000 PRs. |
 | **Build effort** | PoC in 1 day. MVP in 2–3 days. |
 | **Risk** | Religious sensitivity → opt-in per repo, alternate quote sources optional. |
@@ -89,8 +89,8 @@ Optional future modes:
          │
          ▼
 ┌─────────────────────────────┐
-│  Claude API (v1)            │
-│  (sonnet-4-6 or haiku-4-5)  │
+│  Claude Haiku 4.5           │
+│  (Workers AI env.AI binding)│
 │                             │
 │  System prompt asks for:    │
 │  • Bible verse matching     │
@@ -141,7 +141,7 @@ predictable and non-random.
 | Trigger / runtime | **Cloudflare Workers** | Free tier, sub-100ms cold start, native WebCrypto for HMAC + RS256 |
 | Web framework | **Hono** | Tiny (~12 KiB), Workers-native routing |
 | GitHub auth | **`jose` for App JWT** + raw `fetch` for token exchange | Two endpoints; Octokit would be overkill |
-| LLM | **Claude API** (sonnet-4-6 default, haiku-4-5 for cost mode) | Better vibe-matching than smaller models, prompt caching cuts cost |
+| LLM | **Claude Haiku 4.5** via the Cloudflare Workers AI `env.AI` binding (proxied; billed through Unified Billing) | Accurate bilingual CUV+KJV recall, no reasoning-token trap, no separate API key. Cheap Workers AI models mis-recalled the CUV and couldn't be constrained via the binding. |
 | Verse fallback | **Curated JSON** of pre-tagged verses + default | Used if API fails, rate-limits, or hallucinates |
 | Config | `.github/prayrequest.yml` per repo (planned) | Verse language, opt-out paths, alternate quote sources |
 | Optional analytics | **PostHog** | Track 👍/👎 reactions to learn which verses land |
@@ -149,16 +149,17 @@ predictable and non-random.
 ### Why an App (not an Action)
 
 Earlier drafts shipped as a GitHub Action because it had no infra cost. That
-path is gone — once the App calls the Claude API, it needs `ANTHROPIC_API_KEY`
-anyway, which kills the "drop two files, no secrets" pitch the Action
-existed for. The hosted App is now the only distribution.
+path is gone — the App needs hosted GitHub App credentials (App ID, private
+key, webhook secret) and a billing-enabled LLM path anyway, which kills the
+"drop two files, no secrets" pitch the Action existed for. The hosted App is
+now the only distribution.
 
 | | GitHub App on Workers | (former) Action path |
 |---|---|---|
 | Setup | Install once at org level | Drop workflow file per repo |
 | Latency | sub-100ms cold start | ~10s runner spin-up |
 | Auth | App JWT → installation token | Default `GITHUB_TOKEN` |
-| LLM secrets | One Cloudflare secret | Per-repo `ANTHROPIC_API_KEY` |
+| LLM secrets | None — Workers AI binding + Unified Billing | Per-repo `ANTHROPIC_API_KEY` |
 | Summon UX | `@mention` + (planned) reviewer-add | Workflow listens on `issue_comment` |
 
 #### Request-review as a trigger
@@ -211,23 +212,25 @@ App took over; the keyword-matching logic moved to TypeScript at
 - `@prayrequest reroll` → walks the issue's comments, finds the bot's
   last verse, excludes it from the next pick (matched via hidden HTML
   comment anchor `<!-- prayrequest:ref=… -->`).
-- **No LLM yet** — keyword matcher with word-boundary tag matching
-  against PR title, JSON-order priority, and a `massive`-tag override
-  for big diffs.
+- Keyword matcher with word-boundary tag matching against PR title,
+  JSON-order priority, and a `massive`-tag override for big diffs — now
+  the **fallback** beneath the v1 LLM (see below).
 - Open: **Request-review as trigger** — add `@prayrequest` as a
   reviewer, respond on `pull_request: [review_requested]`. Underlying
   API supports this for any App; UI sidebar prominence may stay
   Copilot-only. To be confirmed.
 
-### v1 — Claude-powered matching (next milestone)
-- Replace `pickVerse` in `app/src/verse-picker.ts` with a Claude API
-  call (full PR context: title + description + diff shape + signals).
-- Validate Claude's output against the curated verse JSON to guard
-  against hallucinated references; fall back to the keyword matcher on
-  API failure or invalid response.
+### v1 — Claude-powered matching ✅
+- `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Claude Haiku 4.5
+  with PR context (title + description + diff size + recent commits).
+- Reached via the Cloudflare Workers AI `env.AI` binding (proxied
+  `anthropic/*`) — **no `ANTHROPIC_API_KEY`**; needs Unified Billing
+  enabled on the account instead.
+- Validates the reference against the Bible canon (`bible-canon.ts`) and
+  falls back to the keyword matcher on failure, timeout, or invalid ref.
 - Same surface (auto-bless, summon, reroll), smarter picks.
-- Adds `ANTHROPIC_API_KEY` as a Cloudflare secret. Daily per-repo
-  comment cap (Cloudflare KV) lands here too.
+- Still pending: deterministic signal extraction, hybrid ref→canonical-text
+  lookup, prompt caching, and the daily per-repo comment cap (Cloudflare KV).
 
 ### v3 — Polish (open-ended)
 - React-emoji feedback loop (👍/👎 → log to PostHog)
@@ -331,11 +334,12 @@ App took over; the keyword-matching logic moved to TypeScript at
 
 ## Next Step
 
-v2 ✅ shipped — App is deployed, installed on this repo, auto-bless +
-summon + reroll all working end-to-end with the keyword matcher.
+v1 ✅ shipped — App is deployed and installed on this repo; auto-bless +
+summon + reroll all work end-to-end, and verse selection is LLM-driven
+(Claude Haiku 4.5 via the Workers AI binding) with the keyword matcher as
+fallback.
 
-**Next is v1**: swap `pickVerse` in `app/src/verse-picker.ts` for a
-Claude API call with full PR context (title + description + diff shape
-+ signals). Validate output against the curated JSON to guard against
-hallucinated references; fall back to the keyword matcher on API
-failure. Adds `ANTHROPIC_API_KEY` as a Cloudflare secret.
+**Next**: the items deferred from v1 — deterministic signal extraction
+before the LLM call, the hybrid ref→canonical-text lookup (so recalled
+verse text is verified, not just the reference), prompt caching, and the
+daily per-repo comment cap (Cloudflare KV) as the runaway-cost guard.

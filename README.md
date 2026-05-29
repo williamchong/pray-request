@@ -3,6 +3,9 @@
 > 因為，出於神的話，沒有一句不帶能力的。
 > 路加福音 1:37
 
+> For with God nothing shall be impossible.
+> Luke 1:37
+
 > **Every PR is a PrayRequest.**
 > 合併之前，先讀一段。
 
@@ -14,9 +17,11 @@ and steps back; readers project their own meaning onto it.
 
 ## What It Does
 
-PrayRequest reads the PR title and diff shape, picks a matching verse
-from a curated list, and posts it as a comment. A sample of the
-mapping:
+PrayRequest reads the PR's title, description, diff size, and recent
+commits, asks Claude Haiku 4.5 for a verse that fits the change, and
+posts it as a comment. If the model is unavailable it falls back to a
+curated keyword matcher — the same table drives that fallback and shows
+the kind of mapping to expect:
 
 | PR pattern                            | Verse reference   | Vibe                              |
 |---------------------------------------|-------------------|-----------------------------------|
@@ -42,10 +47,13 @@ Scripture quotes are intended to use public-domain translations: Chinese Union V
 
 ## What It Looks Like
 
-A `hotfix:` PR gets:
+A `hotfix:` PR gets (every comment is bilingual — 和合本 + KJV):
 
-> > 「在那日，我必重建大衛倒塌的帳幕，修補其中的缺口；我必建立那遭破壞的，重新修造，如古時一般⋯⋯」
+> > 在那日，我必重建大衛倒塌的帳幕，修補其中的缺口⋯⋯
 > > — *阿摩司書 9:11*
+> >
+> > In that day will I raise up the tabernacle of David that is fallen, and close up the breaches thereof⋯
+> > — *Amos 9:11*
 >
 > *— 🙏 PrayRequest*
 
@@ -53,6 +61,9 @@ A 500+ line `refactor:` PR gets:
 
 > > 那位坐在寶座上的說：「看哪，我把一切都更新了！」⋯⋯
 > > — *啟示錄 21:5*
+> >
+> > And he that sat upon the throne said, Behold, I make all things new⋯
+> > — *Revelation 21:5*
 >
 > *— 🙏 PrayRequest*
 
@@ -103,10 +114,11 @@ with `@prayrequest`. The display name keeps "PrayRequest" casing; the
 @-mention slug is lowercased per GitHub convention as
 `@prayrequest[bot]`.
 
-**Currently shipped (v2).** Cloudflare Workers + TypeScript. Auto-bless
+**Currently shipped (v1).** Cloudflare Workers + TypeScript. Auto-bless
 fires when `@prayrequest` is in the PR title or body. `@prayrequest`
 in any PR comment summons. `@prayrequest reroll` picks an alternate.
-Verse selection uses a keyword matcher; no LLM yet.
+Verse selection is LLM-driven (Claude Haiku 4.5 via the Cloudflare
+Workers AI binding), with the curated keyword matcher as a fallback.
 
 Setup and deploy: [`app/README.md`](app/README.md).
 Full roadmap and design rationale: [`docs/plan.md`](docs/plan.md).
