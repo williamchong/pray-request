@@ -315,9 +315,11 @@ App took over; the keyword-matching logic moved to TypeScript at
    third-party App without Copilot-tier UI privileges. If yes, advertise
    "add `@prayrequest` as a reviewer" as a first-class summon mode (and
    solves the autocomplete-discoverability gap).
-4. **Marketplace listing**: keep private install (single-link) or publish
-   on the Marketplace for public discovery. Marketplace requires a verified
-   publisher, listing copy, screenshots, and a separate review process.
+4. ~~**Marketplace listing**: keep private install (single-link) or publish
+   on the Marketplace for public discovery.~~ Decided: publish as a free
+   listing. Free listings need no verified publisher or install minimum —
+   only listing copy, logo/screenshots, a privacy policy
+   ([`PRIVACY.md`](../PRIVACY.md)), and a support link.
 
 ---
 
