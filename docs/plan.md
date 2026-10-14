@@ -16,7 +16,7 @@ readers interpret it however they want.
 | **What** | GitHub bot that comments a Bible verse on PRs, matched to the PR's context |
 | **Why** | Team's YOLO-PR culture has no artifact. Canonize the vibe. |
 | **How** | GitHub App on Cloudflare Workers → Gemini 3.5 Flash-Lite (Workers AI binding) → POST comment |
-| **Cost** | ~$0.002 per PR. ~$2/month at 1,000 PRs. |
+| **Cost** | ~$0.0004 per PR (measured). ~$0.40/month at 1,000 PRs. |
 | **Build effort** | PoC in 1 day. MVP in 2–3 days. |
 | **Risk** | Religious sensitivity → opt-in per repo, alternate quote sources optional. |
 
@@ -39,7 +39,7 @@ that matches the energy. No editorial commentary — the verse stands alone.
   interpretation. Lowers religious-sensitivity risk and makes the bot easy to
   localize without rewriting tone.
 - **Low-cost to run.** Cloudflare Workers free tier swallows everything
-  pre-viral. ~$0.002/PR for the LLM call once v1 lands.
+  pre-viral. ~$0.0004/PR for the LLM call (Gemini 3.5 Flash-Lite).
 - **Opt-in per PR.** Auto-bless only fires when `@prayrequest` appears
   in the PR title or body. Repos that install the App don't get a
   verse on every PR — only on the ones that ask for one.
@@ -178,19 +178,19 @@ v2 spec.
 
 ## Costs
 
-Per-PR cost breakdown using Claude Sonnet 4.6 with prompt caching:
+Measured per-PR cost with Gemini 3.5 Flash-Lite ($0.30 / $2.50 per MTok
+via Workers AI Unified Billing, no prompt caching):
 
 | Item | Tokens | Cost |
 |---|---|---|
-| Cached system prompt | ~800 in (cached) | negligible |
-| PR context (title + desc + diff summary) | ~500 in | $0.0015 |
-| Output (verse + reference) | ~50 out | $0.0008 |
-| **Per PR** | | **~$0.002** |
+| System prompt + PR context (title, description, size, commits) | ~450 in | ~$0.00014 |
+| Output (bilingual verse JSON) | ~100 out | ~$0.00025 |
+| **Per PR** | | **~$0.0004** |
 
-At 1,000 PRs/month: **~$2**. At 10,000: ~$20. Cloudflare Workers free
-tier covers the webhook traffic at this volume.
-
-A Haiku-only "cost mode" cuts this by ~5×.
+At 1,000 PRs/month: **~$0.40**. At 10,000: ~$4. Well under the ~$0.002/PR
+ceiling. Cloudflare Workers free tier covers the webhook traffic, and AI
+Gateway spend limits (a daily total plus a per-repo share) cap the worst
+case. Earlier picks used Claude Haiku 4.5 at ~$0.0018/PR.
 
 ---
 
@@ -238,7 +238,7 @@ App took over; the keyword-matching logic moved to TypeScript at
 - Verse-fatigue dampening (don't repeat same verse within N PRs)
 - Per-repo config (`.github/prayrequest.yml`): language, alternate quote
   sources (Tao Te Ching, Sun Tzu, Shakespeare for non-religious teams)
-- Publish App on Marketplace, landing page, docs
+- Publish App on Marketplace (free listing in progress), landing page, docs
 
 ---
 

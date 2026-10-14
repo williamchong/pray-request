@@ -120,7 +120,9 @@ in any PR comment summons. `@prayrequest reroll` picks an alternate.
 Verse selection is LLM-driven (Gemini 3.5 Flash-Lite via the Cloudflare
 Workers AI binding), with the curated keyword matcher as a fallback.
 
-Setup and deploy: [`app/README.md`](app/README.md).
+Install: [github.com/apps/prayrequest](https://github.com/apps/prayrequest).
+Self-host setup and deploy: [`app/README.md`](app/README.md).
+Privacy: [`PRIVACY.md`](PRIVACY.md).
 Full roadmap and design rationale: [`docs/plan.md`](docs/plan.md).
 
 ---

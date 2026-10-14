@@ -16,13 +16,15 @@ App's bot user.
 | File | Purpose |
 |---|---|
 | `src/index.ts` | Hono app, `/webhook` route, signature verify, dispatch |
-| `src/verify.ts` | HMAC-SHA256 verification of `X-Hub-Signature-256` |
+| `src/verify.ts` | HMAC-SHA256 verification of `X-Hub-Signature-256` (rejects all webhooks if the secret is empty) |
 | `src/github-auth.ts` | App JWT (RS256 via `jose`) → installation token, with per-isolate cache |
-| `src/github-api.ts` | `postComment`, `findLastBotComment`, `getPullRequest`, `extractRefFromBody` |
+| `src/github-api.ts` | `postComment`, `findLastBotComment`, `getPullRequest`, `getPullRequestCommitsOrEmpty`, `extractRefFromBody` |
 | `src/verse-picker.ts` | `pickVerseWithLLM` (Gemini 3.5 Flash-Lite via `env.AI`) + `pickVerse` keyword fallback (loads `../../.github/prayrequest-verses.json`; word-boundary, JSON-order priority, massive-diff override). Validates refs against `bible-canon.ts`. |
+| `src/bible-canon.ts` | 66-book Protestant canon (Chinese + English names, chapter counts) used to reject hallucinated model references |
+| `src/summon.ts` | `@prayrequest` / reroll regexes and the bot login prefix, shared by both handlers |
 | `src/handlers/pull-request.ts` | Auto-bless on `opened` / `ready_for_review` |
 | `src/handlers/issue-comment.ts` | `@prayrequest` summon, `@prayrequest reroll` |
-| `test/index.spec.ts` | Verse-picker parity tests (vitest) |
+| `test/index.spec.ts` | Vitest suite: keyword matcher, LLM request shape and fallbacks, verse validation, comment format, signature verification |
 
 ---
 
@@ -62,6 +64,11 @@ npx wrangler secret put GITHUB_WEBHOOK_SECRET    # paste the random string from 
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY < app-pkcs8.pem
 ```
 
+`secret put` reads the value from an interactive prompt. In a
+non-interactive shell (CI, scripts, agent tools) it uploads an
+**empty** secret, so pipe the value in instead:
+`printf '%s' "$VALUE" | npx wrangler secret put GITHUB_WEBHOOK_SECRET`.
+
 > **Enable Unified Billing for the LLM.** Verse selection calls the proxied
 > `google/gemini-3.5-flash-lite` model through the Workers AI `env.AI` binding.
 > Proxied (non-`@cf/`) models route through AI Gateway and require **Unified
@@ -100,6 +107,10 @@ npm install --ignore-scripts          # --ignore-scripts skips a transitive shar
 npx wrangler dev                       # http://localhost:8787
 ```
 
+The `AI` binding always calls the real (remote) model, even in `wrangler
+dev`, so local LLM picks spend Unified Billing credits and need
+`npx wrangler login`.
+
 For local secrets, create `app/.dev.vars` (gitignored):
 
 ```
@@ -123,8 +134,10 @@ npx smee-client --url https://smee.io/<your-channel> --target http://localhost:8
 npx vitest run
 ```
 
-Verse-picker tests cover the matcher's behavior: massive override,
-word-boundary matching, default fallback, reroll-exclude.
+Tests cover the keyword matcher (massive override, word-boundary
+matching, default fallback, reroll-exclude), the LLM request shape
+(system-role message, gateway metadata) and its fallbacks, verse-text
+validation, comment formatting, and webhook signature verification.
 
 ---
 
@@ -164,11 +177,13 @@ caps each repo's share. A capped request errors and falls back to the
 keyword matcher, so an over-budget repo still gets a (keyword) verse. This
 caps LLM cost, not comment count.
 
-**Reroll detection.** `@prayrequest reroll` walks the issue's comment
-history (`per_page=100`, last page) and finds the most recent comment
+**Reroll detection.** `@prayrequest reroll` fetches the first page of the
+issue's comments (`per_page=100`) and finds the most recent comment
 whose author login starts with `prayrequest` and whose `user.type` is
 `Bot`. The previous verse's reference is parsed back out of that
-comment's body and excluded from the next pick.
+comment's body and excluded from the next pick. On threads with more
+than 100 comments the bot's latest verse may be missed, so a reroll can
+repeat it.
 
 ---
 
