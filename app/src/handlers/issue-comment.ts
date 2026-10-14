@@ -20,7 +20,7 @@ interface IssueCommentEvent {
 		pull_request?: unknown;
 		title: string;
 	};
-	repository: { name: string; owner: { login: string } };
+	repository: { id: number; name: string; owner: { login: string } };
 	installation: { id: number };
 }
 
@@ -61,6 +61,7 @@ export async function handleIssueComment(event: IssueCommentEvent, env: Env): Pr
 		changedFiles: pr.changed_files,
 		commits,
 		excludeRef,
+		repoId: event.repository.id,
 	});
 
 	await postComment(token, owner, repo, issueNumber, formatComment(verse));

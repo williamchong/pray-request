@@ -14,7 +14,7 @@ interface PullRequestEvent {
 		user: { type: string };
 		draft: boolean;
 	};
-	repository: { name: string; owner: { login: string } };
+	repository: { id: number; name: string; owner: { login: string } };
 	installation: { id: number };
 }
 
@@ -48,6 +48,7 @@ export async function handlePullRequest(event: PullRequestEvent, env: Env): Prom
 		additions: event.pull_request.additions,
 		changedFiles: event.pull_request.changed_files,
 		commits,
+		repoId: event.repository.id,
 	});
 	await postComment(token, owner, repo, prNumber, formatComment(verse));
 }

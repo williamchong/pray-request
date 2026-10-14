@@ -46,6 +46,8 @@ export interface LLMVerseInput extends VerseInput {
 	prBody: string | null;
 	/** Commit subjects. Bounded by the caller to keep the prompt small; empty when unavailable. */
 	commits: string[];
+	/** GitHub `repository.id` (stable across renames). Keys the per-repo AI Gateway spend limit. */
+	repoId: number;
 }
 
 // Generation mode: model recalls a verse freely from its training. Once we
@@ -107,9 +109,16 @@ export interface AiLike {
 	run(
 		model: string,
 		inputs: Record<string, unknown>,
-		options?: { signal?: AbortSignal },
+		options?: { signal?: AbortSignal; gateway?: GatewayOptions },
 	): Promise<unknown>;
 }
+
+// Cost guard lives in the dashboard, not in code: spend-limit rules on this
+// gateway cap total daily spend and, split by the `repo` metadata key, each
+// repo's share. A capped request errors, which falls through to the keyword
+// matcher below — so a repo over budget still gets a verse, just not an LLM
+// one.
+const AI_GATEWAY_ID = "default";
 
 export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promise<Verse> {
 	try {
@@ -124,7 +133,15 @@ export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promis
 				],
 				max_tokens: LLM_MAX_TOKENS,
 			},
-			{ signal: AbortSignal.timeout(LLM_TIMEOUT_MS) },
+			{
+				signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+				gateway: {
+					id: AI_GATEWAY_ID,
+					metadata: { repo: input.repoId },
+					// Keep PR text out of AI Gateway logs; PRIVACY.md promises this.
+					collectLog: false,
+				},
+			},
 		);
 		const text = extractText(raw);
 		// These three branches all fall back to the keyword matcher, which emits

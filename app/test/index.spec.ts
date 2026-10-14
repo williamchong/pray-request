@@ -318,6 +318,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 50,
 			changedFiles: 3,
 			commits: [],
+			repoId: 1,
 		});
 		expect(v.ref).toBe("羅馬書 8:28");
 		expect(v.alt?.ref).toBe("Romans 8:28");
@@ -336,6 +337,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits,
+			repoId: 1,
 		});
 		return runMock.mock.calls[0]?.[1] as {
 			messages: Array<{ role: string; content: string }>;
@@ -370,6 +372,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits: [],
+			repoId: 1,
 		});
 		// hotfix keyword path
 		expect(v.ref).toBe("阿摩司書 9:11");
@@ -383,6 +386,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits: [],
+			repoId: 1,
 		});
 		expect(v.ref).toBe("以弗所書 6:11");
 	});
@@ -409,6 +413,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits: [],
+			repoId: 1,
 			excludeRef: "Matthew 26:41",
 		});
 		expect(v.ref).not.toBe("馬太福音 26:41");
@@ -424,6 +429,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits: [],
+			repoId: 1,
 		});
 		expect(v.ref).toBe("羅馬書 8:28");
 		expect(v.alt?.ref).toBe("Romans 8:28");
@@ -437,6 +443,7 @@ describe("pickVerseWithLLM", () => {
 			additions: 5,
 			changedFiles: 1,
 			commits: [],
+			repoId: 1,
 		});
 		expect(v.ref).toBe("羅馬書 8:28");
 		expect(v.alt?.ref).toBe("Romans 8:28");
@@ -449,6 +456,27 @@ describe("pickVerseWithLLM", () => {
 		expect(body).not.toHaveProperty("system");
 		expect(body.messages[0]?.role).toBe("system");
 		expect(body.messages[0]?.content).toContain("PrayRequest");
+	});
+
+	// The per-repo spend limit is a gateway rule split by `repo` metadata; if
+	// the metadata goes missing, every repo silently shares one budget.
+	it("routes through the AI Gateway with repo metadata and logging off", async () => {
+		const runMock = vi.fn<AiLike["run"]>(async () => ({
+			choices: [{ message: { content: bilingualContent } }],
+		}));
+		await pickVerseWithLLM({ run: runMock }, {
+			prTitle: "feat: add feature",
+			prBody: null,
+			additions: 5,
+			changedFiles: 1,
+			commits: [],
+			repoId: 42,
+		});
+		expect(runMock.mock.calls[0]?.[2]?.gateway).toEqual({
+			id: "default",
+			metadata: { repo: 42 },
+			collectLog: false,
+		});
 	});
 });
 
