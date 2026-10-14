@@ -323,10 +323,10 @@ describe("pickVerseWithLLM", () => {
 		expect(v.alt?.ref).toBe("Romans 8:28");
 	});
 
-	// Runs pickVerseWithLLM with a spy AI binding and returns the exact user
-	// content that hit the model — lets us assert prompt structure without
+	// Runs pickVerseWithLLM with a spy AI binding and returns the exact request
+	// body that hit the model — lets us assert prompt structure without
 	// reaching into vi mock internals at each call site.
-	async function captureUserContent(commits: string[]): Promise<string> {
+	async function captureRunBody(commits: string[]) {
 		const runMock = vi.fn<AiLike["run"]>(async () => ({
 			choices: [{ message: { content: bilingualContent } }],
 		}));
@@ -337,10 +337,14 @@ describe("pickVerseWithLLM", () => {
 			changedFiles: 1,
 			commits,
 		});
-		const callArgs = runMock.mock.calls[0]?.[1] as {
+		return runMock.mock.calls[0]?.[1] as {
 			messages: Array<{ role: string; content: string }>;
 		};
-		return callArgs.messages.find((m) => m.role === "user")?.content ?? "";
+	}
+
+	async function captureUserContent(commits: string[]): Promise<string> {
+		const body = await captureRunBody(commits);
+		return body.messages.find((m) => m.role === "user")?.content ?? "";
 	}
 
 	it("threads commit subjects into the LLM user content as a 'Recent commits:' block", async () => {
@@ -436,6 +440,15 @@ describe("pickVerseWithLLM", () => {
 		});
 		expect(v.ref).toBe("羅馬書 8:28");
 		expect(v.alt?.ref).toBe("Romans 8:28");
+	});
+
+	// Workers AI chat models drop a top-level `system` field without error,
+	// so an Anthropic-shaped body would silently lose the whole system prompt.
+	it("sends the system prompt as a system-role message", async () => {
+		const body = await captureRunBody([]);
+		expect(body).not.toHaveProperty("system");
+		expect(body.messages[0]?.role).toBe("system");
+		expect(body.messages[0]?.content).toContain("PrayRequest");
 	});
 });
 

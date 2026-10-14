@@ -53,33 +53,33 @@ export interface LLMVerseInput extends VerseInput {
 // ref → we look up the canonical text from the index) so hallucinated
 // chapter:verse pairs get caught before they're posted.
 //
-// Claude Haiku 4.5, reached through the same `env.AI` binding (Cloudflare
-// proxies anthropic/* models — no separate API key, but the account must have
+// Gemini 3.5 Flash-Lite, reached through the `env.AI` binding (Cloudflare
+// proxies google/* models — no separate API key, but the account must have
 // Unified Billing enabled or the call errors "2021: Invalid User Credentials").
-// Chosen over the cheap Workers AI reasoning models because their
-// Traditional-CUV recall was unreliable and — the non-obvious part — the
-// native binding silently drops the params that would tame their thinking
-// (reasoning_effort / response_format / guided_json), so they spent the whole
-// token budget reasoning and returned content:null. Haiku has no reasoning
-// trap, for ~$0.0018/PR. Response is Anthropic Messages-shaped
-// (content:[{text}]); see extractText.
-const LLM_MODEL = "anthropic/claude-haiku-4.5";
+// Chosen over the cheap Workers AI native models because their
+// Traditional-CUV recall was unreliable (Qwen3-30B invented most of its CUV
+// text) and — the non-obvious part — the native binding silently drops the
+// params that would tame their thinking (reasoning_effort / response_format /
+// guided_json), so reasoning models spent the whole token budget reasoning
+// and returned content:null. Flash-Lite emits no reasoning tokens here:
+// measured ~450 in / ~100 out, ~$0.0004/PR at $0.30/$2.50 per MTok.
+// Response is OpenAI chat-completion-shaped; see extractText.
+const LLM_MODEL = "google/gemini-3.5-flash-lite";
 
 // PRs occasionally paste 10k-line stack traces, release notes, or migration
 // scripts into the description. 1500 chars (~400 tokens) is enough prose for
 // the model to grasp intent without ballooning per-PR cost.
 const MAX_BODY_CHARS = 1500;
 
-// Caps Haiku's output. The bilingual answer is 4 string fields (~150-200
-// tokens; long Chinese verses hit ~120-180 by themselves). Haiku emits the
-// JSON directly with no reasoning trace to budget for, so 512 is comfortable
-// headroom and keeps cost ~$0.0018/PR, under the $0.002 ceiling.
+// Caps the model's output. The bilingual answer is 4 string fields, mostly
+// the long Chinese verse (measured 75-140 tokens). There's no reasoning trace
+// to budget for, so 512 is comfortable headroom.
 const LLM_MAX_TOKENS = 512;
 
 // Worker handlers run inside `waitUntil`, so a hung model call would keep the
 // request slot alive until the platform timeout. Bound it ourselves and fall
-// through to the keyword matcher on timeout. Haiku typically answers in a
-// couple seconds; 10s is generous headroom without leaving a stuck request
+// through to the keyword matcher on timeout. Flash-Lite typically answers in
+// 1-2 seconds; 10s is generous headroom without leaving a stuck request
 // hanging.
 const LLM_TIMEOUT_MS = 10000;
 
@@ -116,12 +116,12 @@ export async function pickVerseWithLLM(ai: AiLike, input: LLMVerseInput): Promis
 		const raw = await ai.run(
 			LLM_MODEL,
 			{
-				// Anthropic Messages shape: the system prompt is a top-level
-				// `system` field, not a system-role message. `messages` carries
-				// only the user turn.
-				system: SYSTEM_PROMPT,
-				messages: [{ role: "user", content: buildUserContent(input) }],
-				temperature: 0.7,
+				// Chat-completions shape. claude-* models take a top-level
+				// `system` field instead.
+				messages: [
+					{ role: "system", content: SYSTEM_PROMPT },
+					{ role: "user", content: buildUserContent(input) },
+				],
 				max_tokens: LLM_MAX_TOKENS,
 			},
 			{ signal: AbortSignal.timeout(LLM_TIMEOUT_MS) },
@@ -187,9 +187,10 @@ function buildUserContent(input: LLMVerseInput): string {
 
 // Normalizes the three response shapes we may see across model families:
 // - Anthropic Messages (claude-* proxied): `content` is an array of blocks;
-//   the text block holds the answer. This is the current LLM_MODEL's shape.
-// - OpenAI chat completions (`choices[0].message.content`) — Workers AI native
-//   text models and the OpenAI-compatible endpoint.
+//   the text block holds the answer.
+// - OpenAI chat completions (`choices[0].message.content`) — the current
+//   LLM_MODEL's shape, Workers AI native text models, and the
+//   OpenAI-compatible endpoint.
 // - Legacy `BaseAiTextGeneration` (`{ response: string }`).
 // Accepting all three means a future model swap doesn't break extraction.
 function extractText(raw: unknown): string | null {
