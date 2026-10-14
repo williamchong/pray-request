@@ -15,7 +15,7 @@ readers interpret it however they want.
 |---|---|
 | **What** | GitHub bot that comments a Bible verse on PRs, matched to the PR's context |
 | **Why** | Team's YOLO-PR culture has no artifact. Canonize the vibe. |
-| **How** | GitHub App on Cloudflare Workers → Claude Haiku 4.5 (Workers AI binding) → POST comment |
+| **How** | GitHub App on Cloudflare Workers → Gemini 3.5 Flash-Lite (Workers AI binding) → POST comment |
 | **Cost** | ~$0.002 per PR. ~$2/month at 1,000 PRs. |
 | **Build effort** | PoC in 1 day. MVP in 2–3 days. |
 | **Risk** | Religious sensitivity → opt-in per repo, alternate quote sources optional. |
@@ -89,7 +89,7 @@ Optional future modes:
          │
          ▼
 ┌─────────────────────────────┐
-│  Claude Haiku 4.5           │
+│  Gemini 3.5 Flash-Lite      │
 │  (Workers AI env.AI binding)│
 │                             │
 │  System prompt asks for:    │
@@ -117,7 +117,7 @@ GitHub treats PRs as a subtype of issues at the API layer.
 
 ### Signal extraction
 
-Before calling Claude, the Worker enriches the PR with cheap heuristic signals
+Before calling the LLM, the Worker enriches the PR with cheap heuristic signals
 that bias verse selection:
 
 | Signal | Detection | Vibe |
@@ -129,7 +129,7 @@ that bias verse selection:
 | Massive diff | >500 lines or >20 files changed | new creation |
 | Force push | commit count drop | revisionist |
 
-Signals are passed to Claude as structured input so verse matching is
+Signals are passed to the LLM as structured input so verse matching is
 predictable and non-random.
 
 ---
@@ -141,7 +141,7 @@ predictable and non-random.
 | Trigger / runtime | **Cloudflare Workers** | Free tier, sub-100ms cold start, native WebCrypto for HMAC + RS256 |
 | Web framework | **Hono** | Tiny (~12 KiB), Workers-native routing |
 | GitHub auth | **`jose` for App JWT** + raw `fetch` for token exchange | Two endpoints; Octokit would be overkill |
-| LLM | **Claude Haiku 4.5** via the Cloudflare Workers AI `env.AI` binding (proxied; billed through Unified Billing) | Accurate bilingual CUV+KJV recall, no reasoning-token trap, no separate API key. Cheap Workers AI models mis-recalled the CUV and couldn't be constrained via the binding. |
+| LLM | **Gemini 3.5 Flash-Lite** via the Cloudflare Workers AI `env.AI` binding (proxied; billed through Unified Billing) | Good bilingual CUV+KJV recall, no reasoning-token trap, no separate API key, ~$0.0004/PR. Cheap Workers AI native models mis-recalled the CUV and couldn't be constrained via the binding. Previously Claude Haiku 4.5 (~$0.0018/PR). |
 | Verse fallback | **Curated JSON** of pre-tagged verses + default | Used if API fails, rate-limits, or hallucinates |
 | Config | `.github/prayrequest.yml` per repo (planned) | Verse language, opt-out paths, alternate quote sources |
 | Optional analytics | **PostHog** | Track 👍/👎 reactions to learn which verses land |
@@ -220,11 +220,11 @@ App took over; the keyword-matching logic moved to TypeScript at
   API supports this for any App; UI sidebar prominence may stay
   Copilot-only. To be confirmed.
 
-### v1 — Claude-powered matching ✅
-- `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Claude Haiku 4.5
+### v1 — LLM-powered matching ✅
+- `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Gemini 3.5 Flash-Lite
   with PR context (title + description + diff size + recent commits).
 - Reached via the Cloudflare Workers AI `env.AI` binding (proxied
-  `anthropic/*`) — **no `ANTHROPIC_API_KEY`**; needs Unified Billing
+  `google/*`) — **no provider API key**; needs Unified Billing
   enabled on the account instead.
 - Validates the reference against the Bible canon (`bible-canon.ts`) and
   falls back to the keyword matcher on failure, timeout, or invalid ref.
@@ -300,7 +300,7 @@ App took over; the keyword-matching logic moved to TypeScript at
 | **Cost runaway** | Daily comment cap per repo. Fallback to curated verse list if API errors. Skip bot-authored PRs. |
 | **Spam fatigue** | Auto-bless is opt-in per PR (`@prayrequest` must appear in title or body); silent on every PR that doesn't ask for it. Don't auto-bless on `synchronize` events (only initial open). |
 | **Verse repetition** | Track recently-used verses per repo, dampen reuse within N PRs. |
-| **LLM hallucination of verses** | Validate Claude's output against a known verse index; fall back to curated list if reference doesn't exist. |
+| **LLM hallucination of verses** | Validate the LLM's output against a known verse index; fall back to curated list if reference doesn't exist. |
 | **Verse–context mismatch** | Maintain a small eval set of PR scenarios + expected verse category; run before each prompt change. |
 
 ---
@@ -336,7 +336,7 @@ App took over; the keyword-matching logic moved to TypeScript at
 
 v1 ✅ shipped — App is deployed and installed on this repo; auto-bless +
 summon + reroll all work end-to-end, and verse selection is LLM-driven
-(Claude Haiku 4.5 via the Workers AI binding) with the keyword matcher as
+(Gemini 3.5 Flash-Lite via the Workers AI binding) with the keyword matcher as
 fallback.
 
 **Next**: the items deferred from v1 — deterministic signal extraction

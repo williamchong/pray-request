@@ -1,9 +1,9 @@
 # PrayRequest GitHub App
 
 The hosted Worker that powers the `@prayrequest` bot. Cloudflare Workers
-+ TypeScript + Hono. Receives GitHub webhooks, picks a verse with Claude
-Haiku 4.5 (via the Workers AI binding), and posts a comment as the App's
-bot user.
++ TypeScript + Hono. Receives GitHub webhooks, picks a verse with Gemini
+3.5 Flash-Lite (via the Workers AI binding), and posts a comment as the
+App's bot user.
 
 > Verse selection is LLM-driven (`pickVerseWithLLM` in
 > `src/verse-picker.ts`); the curated keyword matcher (`pickVerse`) is the
@@ -19,7 +19,7 @@ bot user.
 | `src/verify.ts` | HMAC-SHA256 verification of `X-Hub-Signature-256` |
 | `src/github-auth.ts` | App JWT (RS256 via `jose`) → installation token, with per-isolate cache |
 | `src/github-api.ts` | `postComment`, `findLastBotComment`, `getPullRequest`, `extractRefFromBody` |
-| `src/verse-picker.ts` | `pickVerseWithLLM` (Claude Haiku 4.5 via `env.AI`) + `pickVerse` keyword fallback (loads `../../.github/prayrequest-verses.json`; word-boundary, JSON-order priority, massive-diff override). Validates refs against `bible-canon.ts`. |
+| `src/verse-picker.ts` | `pickVerseWithLLM` (Gemini 3.5 Flash-Lite via `env.AI`) + `pickVerse` keyword fallback (loads `../../.github/prayrequest-verses.json`; word-boundary, JSON-order priority, massive-diff override). Validates refs against `bible-canon.ts`. |
 | `src/handlers/pull-request.ts` | Auto-bless on `opened` / `ready_for_review` |
 | `src/handlers/issue-comment.ts` | `@prayrequest` summon, `@prayrequest reroll` |
 | `test/index.spec.ts` | Verse-picker parity tests (vitest) |
@@ -63,11 +63,11 @@ npx wrangler secret put GITHUB_APP_PRIVATE_KEY < app-pkcs8.pem
 ```
 
 > **Enable Unified Billing for the LLM.** Verse selection calls the proxied
-> `anthropic/claude-haiku-4.5` model through the Workers AI `env.AI` binding.
+> `google/gemini-3.5-flash-lite` model through the Workers AI `env.AI` binding.
 > Proxied (non-`@cf/`) models route through AI Gateway and require **Unified
 > Billing** enabled on your Cloudflare account (Dashboard → **AI → AI
 > Gateway**) — without it the call errors `2021: Invalid User Credentials` and
-> the bot silently falls back to the keyword matcher. ~$0.0018/PR. No API key
+> the bot silently falls back to the keyword matcher. ~$0.0004/PR. No API key
 > of your own is needed; Cloudflare manages the provider credentials.
 
 ### 3. Deploy
@@ -144,7 +144,7 @@ redelivery storms.
 opt-in and noisy, and a 500 on every retry would mask the real error
 in logs.
 
-**LLM verse selection.** `pickVerseWithLLM` calls `anthropic/claude-haiku-4.5`
+**LLM verse selection.** `pickVerseWithLLM` calls `google/gemini-3.5-flash-lite`
 via `env.AI` and falls back to the keyword matcher on any failure. Each
 branch logs a distinct line — grep `pickVerseWithLLM:` in `wrangler tail`
 (`LLM verse selected` = real pick; the rest = fallback). Two Workers AI
@@ -174,8 +174,8 @@ comment's body and excluded from the next pick.
 - Outbound GitHub API calls: 1 per auto-bless (post comment, after
   cached token), 2–3 per summon/reroll (get PR + post + maybe list
   comments). Far below the 5,000/hr per-installation rate limit.
-- LLM: one Claude Haiku 4.5 call per verse (~500 in / ~250 out tokens),
-  billed through Workers AI Unified Billing at ~$0.0018/PR — under the
+- LLM: one Gemini 3.5 Flash-Lite call per verse (~450 in / ~100 out tokens),
+  billed through Workers AI Unified Billing at ~$0.0004/PR — under the
   plan's ~$0.002/PR ceiling. No prompt caching yet. The daily per-repo
   comment cap (still TODO) is the real runaway-cost guard.
 

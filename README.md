@@ -18,7 +18,7 @@ and steps back; readers project their own meaning onto it.
 ## What It Does
 
 PrayRequest reads the PR's title, description, diff size, and recent
-commits, asks Claude Haiku 4.5 for a verse that fits the change, and
+commits, asks Gemini 3.5 Flash-Lite for a verse that fits the change, and
 posts it as a comment. If the model is unavailable it falls back to a
 curated keyword matcher — the same table drives that fallback and shows
 the kind of mapping to expect:
@@ -117,7 +117,7 @@ with `@prayrequest`. The display name keeps "PrayRequest" casing; the
 **Currently shipped (v1).** Cloudflare Workers + TypeScript. Auto-bless
 fires when `@prayrequest` is in the PR title or body. `@prayrequest`
 in any PR comment summons. `@prayrequest reroll` picks an alternate.
-Verse selection is LLM-driven (Claude Haiku 4.5 via the Cloudflare
+Verse selection is LLM-driven (Gemini 3.5 Flash-Lite via the Cloudflare
 Workers AI binding), with the curated keyword matcher as a fallback.
 
 Setup and deploy: [`app/README.md`](app/README.md).

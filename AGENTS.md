@@ -2,7 +2,7 @@
 
 This file provides guidance to AI coding agents (Claude Code, Cursor, Aider, Codex, etc.) working with code in this repository. `CLAUDE.md` is a symlink to this file for tools that auto-discover by that name.
 
-> Note: when this file mentions **the verse-picking LLM** (Claude Haiku 4.5, reached through the Cloudflare Workers AI `env.AI` binding — see `app/src/verse-picker.ts`), it refers to the model the *product* calls to pick verses — not the agent reading this file. Don't conflate the two when editing.
+> Note: when this file mentions **the verse-picking LLM** (Gemini 3.5 Flash-Lite, reached through the Cloudflare Workers AI `env.AI` binding — see `app/src/verse-picker.ts`), it refers to the model the *product* calls to pick verses — not the agent reading this file. Don't conflate the two when editing.
 
 ## Repository status
 
@@ -16,7 +16,7 @@ The hosted App lives at `app/` (Cloudflare Workers + TypeScript + Hono). It rece
 - Verse data lives at `.github/prayrequest-verses.json` (legacy location from the v0 Action; the App imports it via `../../.github/prayrequest-verses.json`). Moving it is a future cleanup.
 - The repo root is otherwise non-code: `README.md`, `AGENTS.md`, `docs/plan.md`. Don't introduce package.json, scripts/, or other tooling outside `app/`.
 
-**v1 (LLM-powered verse selection) shipped.** `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Claude Haiku 4.5 (via the Workers AI `env.AI` binding) with PR context — title, description, diff size, recent commit subjects — and the curated keyword matcher (`pickVerse`) is the fallback when the call fails, times out, or returns an unparseable/invalid reference. Still pending from the plan: deterministic signal extraction, the hybrid ref→canonical-text lookup, prompt caching, and the daily per-repo comment cap.
+**v1 (LLM-powered verse selection) shipped.** `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Gemini 3.5 Flash-Lite (via the Workers AI `env.AI` binding) with PR context — title, description, diff size, recent commit subjects — and the curated keyword matcher (`pickVerse`) is the fallback when the call fails, times out, or returns an unparseable/invalid reference. Still pending from the plan: deterministic signal extraction, the hybrid ref→canonical-text lookup, prompt caching, and the daily per-repo comment cap.
 
 ## What PrayRequest is
 
@@ -26,7 +26,7 @@ A GitHub bot that comments a context-matched Bible verse on every PR — verse +
 
 ```
 PR / comment event → Worker /webhook → HMAC verify → installation token mint
-  → Claude Haiku 4.5 (Workers AI env.AI binding) → validate ref against Bible canon
+  → Gemini 3.5 Flash-Lite (Workers AI env.AI binding) → validate ref against Bible canon
   → POST comment        (keyword matcher fallback on any LLM failure)
 ```
 
@@ -49,17 +49,17 @@ These are decisions already made — do **not** revisit without explicit user di
 - **Opt-in per repo** (App must be installed) **and per PR** (`@prayrequest` must appear in PR title or body for auto-bless to fire; comment summon is always explicit). Skip bot-authored PRs (Dependabot, Renovate). Religious sensitivity → never on by default for someone else's repo, never on by accident on someone's PR.
 - **Verse + reference only — no editorial commentary.** The bot does not add snark, sass, or interpretation. Readers project their own meaning onto the verse. This is a deliberate product decision (made post-plan): it lowers religious-sensitivity risk and makes the bot localizable without rewriting tone.
 - **Don't auto-bless on `synchronize` events** — only initial open — to avoid spam on every push.
-- **Cost ceiling: ~$0.002/PR.** Shipped v1 uses Claude Haiku 4.5 via Workers AI Unified Billing at ~$0.0018/PR. No prompt caching yet (the proxied `env.AI` binding path doesn't expose `cache_control`). A daily per-repo comment cap is still required to prevent runaway cost and is not yet implemented.
+- **Cost ceiling: ~$0.002/PR.** Shipped v1 uses Gemini 3.5 Flash-Lite via Workers AI Unified Billing at ~$0.0004/PR (measured ~450 in / ~100 out tokens). No prompt caching yet (the proxied `env.AI` binding path doesn't expose `cache_control`). A daily per-repo comment cap is still required to prevent runaway cost and is not yet implemented.
 - **Per-repo config** lives at `.github/prayrequest.yml` (language, opt-out paths, alternate quote sources like Tao Te Ching / Sun Tzu / Shakespeare for non-religious teams). Not yet implemented.
 
 ## App implementation notes
 
 Things in `app/` that are easy to break by accident:
 
-- **Two entry points: LLM, then keyword fallback.** Handlers call `pickVerseWithLLM(env.AI, …)`, which calls Claude Haiku 4.5 and falls back to `pickVerse` (the keyword matcher below) on any failure. Every exit logs a distinct line — grep `pickVerseWithLLM:` in `wrangler tail` — so a silent keyword fallback is distinguishable from a real LLM pick (`LLM verse selected`).
+- **Two entry points: LLM, then keyword fallback.** Handlers call `pickVerseWithLLM(env.AI, …)`, which calls Gemini 3.5 Flash-Lite and falls back to `pickVerse` (the keyword matcher below) on any failure. Every exit logs a distinct line — grep `pickVerseWithLLM:` in `wrangler tail` — so a silent keyword fallback is distinguishable from a real LLM pick (`LLM verse selected`).
 - **The native `env.AI.run()` binding silently drops OpenAI-style control params.** `reasoning_effort`, `response_format`, and `guided_json` are accepted without error but have *no effect* via the binding — they're only honored on the `/v1/chat/completions` OpenAI-compatible endpoint. This is why a Workers AI reasoning model (gemma-4) couldn't be constrained and spent its whole budget on a `reasoning` field returning `content:null`. Don't re-introduce a reasoning model expecting these knobs to work via the binding.
-- **Proxied models require Unified Billing.** `anthropic/*` (and `google/*`) models via `env.AI` route through AI Gateway and error `2021: Invalid User Credentials` unless Unified Billing is enabled on the Cloudflare account. Native `@cf/` models are keyless. Switching to/from a proxied model means checking this.
-- **`extractText` normalizes three response shapes** — Anthropic Messages (`content[0].text`, the current model), OpenAI (`choices[0].message.content`), and legacy (`{ response }`) — so a model swap doesn't break extraction.
+- **Proxied models require Unified Billing.** `anthropic/*` (and `google/*`) models via `env.AI` route through AI Gateway and error `2021: Invalid User Credentials` unless Unified Billing is enabled on the Cloudflare account. Native `@cf/` models are keyless. Switching to/from a proxied model means checking this. Unified Billing can also be down per provider (`7005: Unified billing service unavailable`); the keyword fallback covers it. Premium native models (DeepSeek V4, Kimi, GLM 5.x) error `5035` on the Workers Free plan.
+- **`extractText` normalizes three response shapes** — Anthropic Messages (`content[].text`), OpenAI (`choices[0].message.content`, the current model), and legacy (`{ response }`) — so a model swap doesn't break extraction.
 - **Verse priority is JSON order.** `pickVerse` in `app/src/verse-picker.ts` walks `verses[]` and picks the first one with any tag matching the (lowercased) PR title. Reorder carefully — putting `feat` before `security` would make every `feat: add admin endpoint` match `feat` not `security`.
 - **Tag matching uses ASCII word-boundary** (`(^|[^a-z0-9])tag([^a-z0-9]|$)`) so `fix` doesn't match `prefix` and `auth` doesn't match `author`. JS `\b` includes `_`, so it's *not* equivalent — keep the explicit non-alnum class.
 - **`massive` tag is a special override.** When `additions > 500` or `changed_files > 20`, the matcher short-circuits to the first verse tagged `massive`. Currently that's the refactor verse.
