@@ -230,7 +230,8 @@ App took over; the keyword-matching logic moved to TypeScript at
   falls back to the keyword matcher on failure, timeout, or invalid ref.
 - Same surface (auto-bless, summon, reroll), smarter picks.
 - Still pending: deterministic signal extraction, hybrid ref→canonical-text
-  lookup, prompt caching, and the daily per-repo comment cap (Cloudflare KV).
+  lookup, and prompt caching. The per-repo cost cap shipped as AI Gateway
+  spend-limit rules keyed by `repo` metadata (caps LLM spend, not comments).
 
 ### v3 — Polish (open-ended)
 - React-emoji feedback loop (👍/👎 → log to PostHog)
@@ -297,7 +298,7 @@ App took over; the keyword-matching logic moved to TypeScript at
 | Risk | Mitigation |
 |---|---|
 | **Religious sensitivity** | Opt-in per repo. Allow alternate quote sources (Tao Te Ching, Sun Tzu, Shakespeare). Verse + reference only — no editorial commentary, so the bot never appears to be mocking the verse or the author. |
-| **Cost runaway** | Daily comment cap per repo. Fallback to curated verse list if API errors. Skip bot-authored PRs. |
+| **Cost runaway** | AI Gateway spend limits: a daily total plus a per-repo share (split by `repo` metadata). Over the limit, fall back to the curated verse list. Skip bot-authored PRs. |
 | **Spam fatigue** | Auto-bless is opt-in per PR (`@prayrequest` must appear in title or body); silent on every PR that doesn't ask for it. Don't auto-bless on `synchronize` events (only initial open). |
 | **Verse repetition** | Track recently-used verses per repo, dampen reuse within N PRs. |
 | **LLM hallucination of verses** | Validate the LLM's output against a known verse index; fall back to curated list if reference doesn't exist. |
@@ -343,5 +344,5 @@ fallback.
 
 **Next**: the items deferred from v1 — deterministic signal extraction
 before the LLM call, the hybrid ref→canonical-text lookup (so recalled
-verse text is verified, not just the reference), prompt caching, and the
-daily per-repo comment cap (Cloudflare KV) as the runaway-cost guard.
+verse text is verified, not just the reference), and prompt caching. (The
+runaway-cost guard shipped as AI Gateway spend limits, total and per-repo.)

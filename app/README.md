@@ -69,6 +69,8 @@ npx wrangler secret put GITHUB_APP_PRIVATE_KEY < app-pkcs8.pem
 > Gateway**) — without it the call errors `2021: Invalid User Credentials` and
 > the bot silently falls back to the keyword matcher. ~$0.0004/PR. No API key
 > of your own is needed; Cloudflare manages the provider credentials.
+> Then add spend-limit rules on the `default` gateway (see **Spend caps**
+> below) — without them a single repo can drain your credits.
 
 ### 3. Deploy
 
@@ -153,9 +155,14 @@ binding **silently ignores** OpenAI-style control params (`reasoning_effort`,
 `response_format`, `guided_json` — only honored on `/v1/chat/completions`),
 and proxied `anthropic/*`/`google/*` models need Unified Billing (see setup).
 
-**Daily comment cap.** Not implemented yet. Required per
-`docs/plan.md`; will land as a Cloudflare KV-backed counter
-(`prayrequest:cap:<repo>:<yyyy-mm-dd>`) in a follow-up.
+**Spend caps.** The LLM call goes through the `default` AI Gateway with
+`metadata: { repo: <repository.id> }` and `collectLog: false`. Cost limits
+are AI Gateway spend-limit rules configured in the dashboard (AI → AI
+Gateway → `default` → Settings → Spend limits), not code: one shared daily
+rule caps total spend, and a second rule split by the `repo` metadata key
+caps each repo's share. A capped request errors and falls back to the
+keyword matcher, so an over-budget repo still gets a (keyword) verse. This
+caps LLM cost, not comment count.
 
 **Reroll detection.** `@prayrequest reroll` walks the issue's comment
 history (`per_page=100`, last page) and finds the most recent comment
@@ -176,8 +183,8 @@ comment's body and excluded from the next pick.
   comments). Far below the 5,000/hr per-installation rate limit.
 - LLM: one Gemini 3.5 Flash-Lite call per verse (~450 in / ~100 out tokens),
   billed through Workers AI Unified Billing at ~$0.0004/PR — under the
-  plan's ~$0.002/PR ceiling. No prompt caching yet. The daily per-repo
-  comment cap (still TODO) is the real runaway-cost guard.
+  plan's ~$0.002/PR ceiling. No prompt caching yet. AI Gateway spend
+  limits (total and per-repo, see above) are the runaway-cost guard.
 
 ---
 

@@ -16,7 +16,7 @@ The hosted App lives at `app/` (Cloudflare Workers + TypeScript + Hono). It rece
 - Verse data lives at `.github/prayrequest-verses.json` (legacy location from the v0 Action; the App imports it via `../../.github/prayrequest-verses.json`). Moving it is a future cleanup.
 - The repo root is otherwise non-code: `README.md`, `AGENTS.md`, `docs/plan.md`. Don't introduce package.json, scripts/, or other tooling outside `app/`.
 
-**v1 (LLM-powered verse selection) shipped.** `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Gemini 3.5 Flash-Lite (via the Workers AI `env.AI` binding) with PR context — title, description, diff size, recent commit subjects — and the curated keyword matcher (`pickVerse`) is the fallback when the call fails, times out, or returns an unparseable/invalid reference. Still pending from the plan: deterministic signal extraction, the hybrid ref→canonical-text lookup, prompt caching, and the daily per-repo comment cap.
+**v1 (LLM-powered verse selection) shipped.** `pickVerseWithLLM` in `app/src/verse-picker.ts` calls Gemini 3.5 Flash-Lite (via the Workers AI `env.AI` binding) with PR context — title, description, diff size, recent commit subjects — and the curated keyword matcher (`pickVerse`) is the fallback when the call fails, times out, or returns an unparseable/invalid reference. Still pending from the plan: deterministic signal extraction, the hybrid ref→canonical-text lookup, and prompt caching.
 
 ## What PrayRequest is
 
@@ -49,7 +49,7 @@ These are decisions already made — do **not** revisit without explicit user di
 - **Opt-in per repo** (App must be installed) **and per PR** (`@prayrequest` must appear in PR title or body for auto-bless to fire; comment summon is always explicit). Skip bot-authored PRs (Dependabot, Renovate). Religious sensitivity → never on by default for someone else's repo, never on by accident on someone's PR.
 - **Verse + reference only — no editorial commentary.** The bot does not add snark, sass, or interpretation. Readers project their own meaning onto the verse. This is a deliberate product decision (made post-plan): it lowers religious-sensitivity risk and makes the bot localizable without rewriting tone.
 - **Don't auto-bless on `synchronize` events** — only initial open — to avoid spam on every push.
-- **Cost ceiling: ~$0.002/PR.** Shipped v1 uses Gemini 3.5 Flash-Lite via Workers AI Unified Billing at ~$0.0004/PR (measured ~450 in / ~100 out tokens). No prompt caching yet (the proxied `env.AI` binding path doesn't expose `cache_control`). A daily per-repo comment cap is still required to prevent runaway cost and is not yet implemented.
+- **Cost ceiling: ~$0.002/PR.** Shipped v1 uses Gemini 3.5 Flash-Lite via Workers AI Unified Billing at ~$0.0004/PR (measured ~450 in / ~100 out tokens). No prompt caching yet (the proxied `env.AI` binding path doesn't expose `cache_control`). Runaway cost is capped by AI Gateway spend-limit rules on the `default` gateway (dashboard config, not code): a shared daily rule plus one split by the `repo` metadata key that `pickVerseWithLLM` attaches. Keep `repoId` and the gateway options on the `env.AI.run` call — without the metadata, every repo shares one budget.
 - **Per-repo config** lives at `.github/prayrequest.yml` (language, opt-out paths, alternate quote sources like Tao Te Ching / Sun Tzu / Shakespeare for non-religious teams). Not yet implemented.
 
 ## App implementation notes

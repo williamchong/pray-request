@@ -60,9 +60,10 @@ PrayRequest has no database of its own.
 - **Operational logs.** Cloudflare keeps Worker logs for a limited period set
   by Cloudflare. They record which verse was chosen, the model's reply when it
   cannot be used, and error details. These logs are used only to debug the App.
-- **Model request logs.** Cloudflare AI Gateway may log model requests and
-  responses, including the pull request text sent to the model, for the
-  period set in its configuration.
+- **Model request logs.** PrayRequest asks Cloudflare AI Gateway not to log
+  model requests or responses. Each request carries the repository's numeric
+  ID so per-repository spending limits can be enforced, and the gateway keeps
+  aggregate figures such as request counts, token counts, and cost.
 - **In memory only.** Short-lived GitHub installation tokens are cached in
   memory while the Worker runs, and are never written to storage.
 
