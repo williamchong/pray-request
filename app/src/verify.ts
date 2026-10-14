@@ -23,6 +23,12 @@ export async function verifySignature(
 	rawBody: string,
 	signatureHeader: string | null,
 ): Promise<boolean> {
+	// An empty secret (e.g. `wrangler secret put` run without a TTY uploads "")
+	// makes importKey throw. Reject with a clear log instead of a bare 500.
+	if (!secret) {
+		console.error("GITHUB_WEBHOOK_SECRET is empty; rejecting all webhooks");
+		return false;
+	}
 	if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
 	const sigHex = signatureHeader.slice("sha256=".length);
 	const sigBytes = hexToBytes(sigHex);

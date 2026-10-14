@@ -8,6 +8,7 @@ import {
 	type AiLike,
 } from "../src/verse-picker";
 import { parseRef, refsAgree } from "../src/bible-canon";
+import { verifySignature } from "../src/verify";
 
 // Refs come from .github/prayrequest-verses.json.
 
@@ -556,5 +557,33 @@ describe("formatComment", () => {
 				"*— 🙏 PrayRequest*\n" +
 				"<!-- prayrequest:ref=詩篇 23:1 -->",
 		);
+	});
+});
+
+describe("verifySignature", () => {
+	const body = '{"zen":"test"}';
+	// GitHub-style `X-Hub-Signature-256` header for `body` under `secret`.
+	const sign = async (secret: string) => {
+		const key = await crypto.subtle.importKey(
+			"raw",
+			new TextEncoder().encode(secret),
+			{ name: "HMAC", hash: "SHA-256" },
+			false,
+			["sign"],
+		);
+		const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
+		return "sha256=" + [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
+	};
+
+	it("accepts a body signed with the secret", async () => {
+		expect(await verifySignature("secret", body, await sign("secret"))).toBe(true);
+	});
+
+	it("rejects a body signed with a different secret", async () => {
+		expect(await verifySignature("secret", body, await sign("other"))).toBe(false);
+	});
+
+	it("rejects instead of throwing when the secret is empty", async () => {
+		expect(await verifySignature("", body, await sign("secret"))).toBe(false);
 	});
 });
